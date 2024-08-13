@@ -1,33 +1,34 @@
 //! Renders an animated sprite by loading all animation frames from a single image (a sprite sheet)
 //! into a texture atlas, and changing the displayed image periodically.
 
-use std::collections::HashMap;
 use bevy::prelude::*;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+use bevy::utils::HashSet;
+use components::{AppState, ColorMaterials, CountDown, CurrentPlayer, GameAssets, HiveTileTag, MainCamera, Neighbors, PlacableTile, PlacableTileState, Player, PositionCache, PossiblePlacementMarker, PossiblePlacementTag};
+use hex_coordinate::HexCoordinate;
+use crate::hex_coordinate::ALL_DIRECTIONS;
+use components::Player::Player1;
+use crate::components::HiveTile;
+use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
+
+mod hex_coordinate;
+mod world_cursor;
+mod components;
 
 fn main() {
-    App::new().add_plugins(DefaultPlugins)
+    App::new().add_plugins((DefaultPlugins, WorldCursorPlugin))
+        .init_state::<AppState>()
         .add_systems(Startup, (setup_assets, setup.after(setup_assets)))
-        .add_systems(Update, build_cache)
+        .add_systems(Update, s_build_cache)
+        .add_systems(Update, s_do_count_down.run_if(in_state(AppState::Wait)))
+        .add_systems(Update, s_update_tile_placement.after(s_build_cache).run_if(in_state(AppState::PlaceTile)))
+        .add_systems(OnEnter(AppState::PlaceTile), s_spawn_placable_tile)
+        .add_systems(OnExit(AppState::PlaceTile), s_cleanup_tile_placement)
         .insert_resource(PositionCache::default())
+        .insert_resource(CountDown(2.))
+        .insert_resource(CurrentPlayer { player: Player1 })
         .run();
 }
-
-#[derive(Resource)]
-struct GameAssets {
-    color_materials: ColorMaterials,
-    mesh:Mesh2dHandle,
-}
-
-#[derive(Resource)]
-struct ColorMaterials {
-    red: Handle<ColorMaterial>,
-    white: Handle<ColorMaterial>,
-    grey: Handle<ColorMaterial>,
-}
-
-#[derive(Resource,Default)]
-struct PositionCache(HashMap<HexCoordinate, Entity>);
 
 
 fn setup_assets(
@@ -53,17 +54,16 @@ fn setup(
     mut commands: Commands,
     assets: Res<GameAssets>,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn((Camera2dBundle::default(), MainCamera));
 
     let origin = HexCoordinate::Origin();
-    for DIRECTION in ALL_DIRECTIONS {
-        commands.spawn(HiveTile::new(origin.get_relative(DIRECTION), assets.mesh.clone(),assets.color_materials.grey.clone()));
-    }
+    commands.spawn(HiveTile::new(origin, &*assets, Player::Player1));
+
 }
 
-fn build_cache(
+fn s_build_cache(
     mut position_cache: ResMut<PositionCache>,
-    mut TileQueue: Query<(Entity,&HexCoordinate)>,
+    mut TileQueue: Query<(Entity,&HexCoordinate),(With<HiveTileTag>)>,
 ) {
     position_cache.0.clear();
 
@@ -75,76 +75,134 @@ fn build_cache(
     }
 }
 
-#[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
-enum MyGameModeState {
-    #[default]
-    PlayersTurn,
-    PlacingNewPiece
-}
-
-#[derive(Component,Default)]
-struct Neighbors([Option<Entity>; 6]);
-#[derive(Component, Default, Copy, Clone, Hash, Debug)]
-#[derive(Eq, PartialEq)]
-struct HexCoordinate{
-    x:i32,
-    y:i32
-}
-
-impl HexCoordinate {
-    fn Origin() -> HexCoordinate {
-        HexCoordinate { x: 0, y: 0 }
+fn s_cleanup_tile_placement(
+    q_possible_placements : Query<(Entity),(With<PossiblePlacementTag>)>,
+    q_placable_tiles : Query<(Entity),(With<PlacableTileState>)>,
+    mut commands: Commands,
+) {
+    for entity in &q_possible_placements {
+        commands.entity(entity).despawn();
     }
-
-    fn get_transform(&self)->Transform{
-
-        let x = self.x as f32 + (self.y as f32/2f32);
-
-        Transform::from_translation(Vec3{x:x*100.,y: self.y as f32 * 90.,z:0f32})
+    for entity in &q_placable_tiles {
+        commands.entity(entity).despawn();
     }
-
-    fn get_relative(&self, direction:&HexDirection) ->HexCoordinate {
-        match direction {
-            HexDirection::UpRight => HexCoordinate { x: self.x, y: self.y + 1 },
-            HexDirection::Right => HexCoordinate { x: self.x + 1, y: self.y },
-            HexDirection::UpLeft => HexCoordinate { x: self.x - 1, y: self.y + 1 },
-            HexDirection::Left => HexCoordinate { x: self.x - 1, y: self.y },
-            HexDirection::DownRight => HexCoordinate { x: self.x + 1, y: self.y - 1 },
-            HexDirection::DownLeft => HexCoordinate { x: self.x, y: self.y - 1 }
-        }
-    }
-
 }
 
-const ALL_DIRECTIONS: [&'static HexDirection; 6] = [&HexDirection::UpRight,&HexDirection::Right,&HexDirection::DownRight, &HexDirection::DownLeft,&HexDirection::Left,&HexDirection::UpLeft,];
+fn s_spawn_placable_tile(
+    time:Res<Time>,
+    mut position_cache: Res<PositionCache>,
+    game_assets : Res<GameAssets>,
+    mut commands: Commands,
+) {
+    let player = Player1;
+    let material = match player {
+        Player::Player1 => { game_assets.color_materials.white.clone() }
+        Player::Player2 => { game_assets.color_materials.red.clone() }
+    };
+    let position = Transform::from_translation(Vec3::new(0., -150., 0.));
 
-
-#[derive(Debug)]
-enum HexDirection {
-    UpRight,
-    Right,
-    DownRight,
-    DownLeft,
-    Left,
-    UpLeft
-}
-
-#[derive(Bundle)]
-struct HiveTile {
-    renderer: MaterialMesh2dBundle<ColorMaterial>,
-    neighbors: Neighbors,
-    coordinate: HexCoordinate
-}
-
-impl HiveTile{
-    fn new(position : HexCoordinate, mesh:Mesh2dHandle,material : Handle<ColorMaterial>)->HiveTile{
-        HiveTile{ renderer: MaterialMesh2dBundle {
-            mesh,
+    let bundle = PlacableTile {
+        renderer: MaterialMesh2dBundle {
+            mesh: game_assets.mesh.clone(),
             material,
-            transform: position.get_transform(),
+            transform: position,
             ..default()
-        }, neighbors: Neighbors(default()),
-            coordinate: position,
+        },
+        neighbors: Neighbors(default()),
+        player,
+        placable_tile_tag: PlacableTileState {selected: false}
+    };
+    commands.spawn(bundle);
+
+  //  spawn placement markers
+   let mut already_checked= HashSet::new();
+    for (position, _) in &position_cache.0 {
+        for position_to_check in ALL_DIRECTIONS.map(|x|position.get_relative(x)) {
+            if already_checked.contains(&position_to_check){
+                continue;
+            }
+
+            already_checked.insert(position_to_check);
+
+
+            let bundle = PossiblePlacementMarker {
+                renderer: MaterialMesh2dBundle {
+                    mesh: game_assets.mesh.clone(),
+                    material:game_assets.color_materials.grey.clone(),
+                    transform: position_to_check.get_transform(-2.),
+                    ..default()
+                },
+                possible_placement_tag: Default::default(),
+                hex_coordinate: position_to_check,
+            };
+            commands.spawn(bundle);
+
+            if position_cache.0.contains_key(&position_to_check){
+                continue;
+            }
         }
     }
 }
+
+fn s_update_tile_placement(
+    world_cursor: Res<WorldCursor>,
+    mut q_placable_tiles:  Query<(&mut Transform, &mut PlacableTileState), (Without<PossiblePlacementTag>)>,
+    mut q_possible_placements:  Query<(&Transform, &PossiblePlacementTag, &HexCoordinate),( Without<PlacableTileState>)>,
+    mut commands: Commands,
+    game_assets: Res<GameAssets>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut timer:ResMut<CountDown>
+){
+    match world_cursor.press_state {
+        PressState::JustPressed => {
+            for (transform, mut state) in &mut q_placable_tiles {
+                let max_distance = 50.;
+                let distance_to_cursor = world_cursor.position.distance(Vec2::new(transform.translation.x,transform.translation.y));
+
+                let selected = distance_to_cursor < max_distance;
+                println!("{}", selected);
+                state.selected= selected;
+            }
+        }
+        PressState::Pressed => {
+            for (mut transform, state) in &mut q_placable_tiles {
+                if state.selected {
+                    transform.translation = Vec3::new(world_cursor.position.x, world_cursor.position.y, 0.);
+                }
+            }
+        }
+        PressState::JustReleased => {
+            for (tile_transform, tile_state) in &mut q_placable_tiles {
+                if tile_state.selected{
+                    for (possible_placement,_, hex_coordinate) in &mut q_possible_placements {
+
+                        println!("a");
+                        if possible_placement.translation.distance(tile_transform.translation)<50.{
+                            println!("b");
+
+                            commands.spawn(HiveTile::new(*hex_coordinate,&game_assets, Player1));
+                            next_state.set(AppState::Wait);
+                            timer.0=1.;
+
+                            break;
+                        }
+                    }
+                }
+            }
+        },
+        _=>{}
+    }
+}
+
+
+fn s_do_count_down(
+    time:Res<Time>,
+    mut count_down: ResMut<CountDown>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    count_down.0 = count_down.0 - time.delta().as_secs_f32();
+    if count_down.0 <= 0. {
+        next_state.set(AppState::PlaceTile);
+    }
+}
+
