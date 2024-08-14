@@ -55,7 +55,6 @@ fn setup_assets(
     let mesh = Mesh2dHandle(meshes.add(RegularPolygon::new(50.0, 6)));
 
     commands.insert_resource(GameAssets{ color_materials, mesh });
-    println!("was geht");
 }
 fn setup(
     mut commands: Commands,
@@ -99,7 +98,6 @@ fn s_cleanup_tile_placement(
 ) {
     for entity in &q_possible_placements {
         commands.entity(entity).despawn();
-        println!("delete");
     }
     for entity in &q_placable_tiles {
         commands.entity(entity).despawn();
@@ -316,31 +314,3 @@ fn s_move_tile(
         }
     }
 }
-/*
-  PressState::Pressed => {
-            for (mut transform, state) in &mut q_placable_tiles {
-                if state.selected {
-                    transform.translation = Vec3::new(world_cursor.position.x, world_cursor.position.y, 0.);
-                }
-            }
-        }
-        PressState::JustReleased => {
-            for (tile_transform, tile_state) in &mut q_placable_tiles {
-                if tile_state.selected{
-                    for (possible_placement,_, hex_coordinate) in &mut q_possible_placements {
-
-                        println!("a");
-                        if possible_placement.translation.distance(tile_transform.translation)<50.{
-                            println!("b");
-
-                            commands.spawn(HiveTile::new(*hex_coordinate,&game_assets, Player1));
-                            next_state.set(AppState::Idle);
-                            timer.0=1.;
-
-                            break;
-                        }
-                    }
-                }
-            }
-        },
- */
