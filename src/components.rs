@@ -7,8 +7,12 @@ use crate::hex_coordinate::HexCoordinate;
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum AppState {
     #[default]
-    Wait,
-    PlaceTile,
+    Init,
+    Idle,
+    MovingTile,
+    Aborting,
+    MoveFinished,
+    PlayerWon
 }
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
@@ -21,13 +25,13 @@ enum TilePlacementState {
 }
 
 
-#[derive(Component)]
+#[derive(Component, Clone, Copy, PartialEq)]
 pub enum Player{
     Player1,
     Player2
 }
 
-#[derive(Resource)]
+#[derive(Resource,Copy,Clone)]
 pub struct CurrentPlayer {
     pub(crate) player :Player
 }
@@ -51,6 +55,9 @@ pub struct PositionCache(pub(crate) HashMap<HexCoordinate, Entity>);
 #[derive(Resource,Default)]
 pub struct CountDown(pub(crate) f32);
 
+#[derive(Resource)]
+pub struct SelectedTile(pub Entity);
+
 /// Used to help identify our main camera
 #[derive(Component)]
 pub struct MainCamera;
@@ -62,8 +69,6 @@ enum MyGameModeState {
     PlacingNewPiece
 }
 
-#[derive(Component,Default)]
-pub struct Neighbors(pub [Option<Entity>; 6]);
 
 #[derive(Component, Default)]
 pub struct PlacableTileState {
@@ -77,13 +82,11 @@ pub struct PossiblePlacementTag {
 
 #[derive(Component, Default)]
 pub struct HiveTileTag {
-    selected:bool,
 }
 
 #[derive(Bundle)]
 pub struct PlacableTile {
     pub(crate) renderer: MaterialMesh2dBundle<ColorMaterial>,
-    pub(crate) neighbors: Neighbors,
     pub(crate) player: Player,
     pub(crate) placable_tile_tag: PlacableTileState
 }
@@ -99,7 +102,6 @@ pub struct PossiblePlacementMarker {
 #[derive(Bundle)]
 pub struct HiveTile {
     renderer: MaterialMesh2dBundle<ColorMaterial>,
-    neighbors: Neighbors,
     coordinate: HexCoordinate,
     player: Player,
     hive_tile_tag:HiveTileTag,
@@ -116,7 +118,7 @@ pub struct HiveTile {
             material,
             transform: position.get_transform(0.),
             ..default()
-        }, neighbors: Neighbors(default()),
+        },
             coordinate: position,
             player,
             hive_tile_tag: Default::default(),
