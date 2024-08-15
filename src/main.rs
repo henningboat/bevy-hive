@@ -1,8 +1,10 @@
 //! Renders an animated sprite by loading all animation frames from a single image (a sprite sheet)
 //! into a texture atlas, and changing the displayed image periodically.
 
+use bevy::ecs::query::QueryEntityError;
 use bevy::prelude::*;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+use bevy::utils::hashbrown::Equivalent;
 use bevy::utils::HashSet;
 use components::*;
 use hex_coordinate::HexCoordinate;
@@ -122,13 +124,69 @@ fn s_spawn_placement_markers(
     time:Res<Time>,
     mut position_cache: Res<PositionCache>,
     q_player:Query<&Player, With<HiveTileTag>>,
+    q_hex_coord:Query<&HexCoordinate, With<HiveTileTag>>,
+    q_is_hive_tile:Query<(), With<HiveTileTag>>,
     game_assets : Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
+    selected_tile: Res<SelectedTile>,
     mut commands: Commands,
 ) {
+    let is_existing_tile = q_is_hive_tile.contains(selected_tile.0) ;
+
+    if is_existing_tile {
+        //determine if the piece can be moved at all
+        let mut checked_tiles: HashSet<HexCoordinate> = HashSet::new();
+        let mut open_list:Vec<HexCoordinate> = vec![];
+        let mut connected_tiles=vec![];
+
+        let all_positions: Vec<_> = position_cache.0.keys().collect();
+        if (all_positions.len() > 0) {
+            open_list.push(all_positions[0].clone());
+
+            loop {
+                if open_list.len() == 0 {
+                    break;
+                }
+
+                let position = open_list.pop().unwrap();
+
+                if checked_tiles.contains(&position){
+                    continue;
+                }
+                checked_tiles.insert(position);
+
+                if !position_cache.0.contains_key(&position){
+                    continue;
+                }
+
+                //we ignore the currently selected piece
+                if &position == q_hex_coord.get(selected_tile.0).unwrap(){
+                    continue;
+                }
+
+                connected_tiles.push(position);
+
+                for DIRECTION in ALL_DIRECTIONS {
+                    let relative = position.get_relative(DIRECTION);
+                    if checked_tiles.contains(&relative){
+                        continue;
+                    }
+                    open_list.push(relative);
+                }
+            }
+
+            if connected_tiles.len() != all_positions.len()-1{
+                return;
+            }
+        }
+    }
     //  spawn placement markers
     let mut already_checked= HashSet::new();
-    for (position, _) in &position_cache.0 {
+    for (position, entity) in &position_cache.0 {
+        if entity.equivalent(&selected_tile.0.clone()){
+            continue;
+        }
+
         for position_to_check in ALL_DIRECTIONS.map(|x|position.get_relative(x)) {
             if already_checked.contains(&position_to_check){
                 continue;
@@ -140,25 +198,27 @@ fn s_spawn_placement_markers(
                 continue;
             }
 
-            let mut touched_other_player=false;
 
-            if q_player.iter().any(|player|*player==current_player.player){
-                for surrounding in ALL_DIRECTIONS.map(|x|position_to_check.get_relative(x)) {
-                    match position_cache.0.get(&surrounding) {
-                        None => {}
-                        Some(e) => {
-                            let x1 = q_player.get(*e).unwrap();
-                            if *x1 != current_player.player{
-                                touched_other_player=true;
+            if !is_existing_tile {
+                let mut touched_other_player = false;
+
+                if q_player.iter().any(|player| *player == current_player.player) {
+                    for surrounding in ALL_DIRECTIONS.map(|x| position_to_check.get_relative(x)) {
+                        match position_cache.0.get(&surrounding) {
+                            None => {}
+                            Some(e) => {
+                                let x1 = q_player.get(*e).unwrap();
+                                if *x1 != current_player.player {
+                                    touched_other_player = true;
+                                }
                             }
                         }
                     }
-
                 }
-            }
 
-            if touched_other_player{
-                continue;
+                if touched_other_player {
+                    continue;
+                }
             }
 
             let bundle = PossiblePlacementMarker {
@@ -242,16 +302,21 @@ Wp    //  spawn placement markers
 
 fn s_update_idle(
     world_cursor: Res<WorldCursor>,
-    mut q_placable_tiles:  Query<(Entity, &mut Transform, &mut PlacableTileState), (Without<PossiblePlacementTag>)>,
-    mut q_possible_placements:  Query<(&Transform, &PossiblePlacementTag, &HexCoordinate),( Without<PlacableTileState>)>,
+    mut q_placable_tiles:  Query<(Entity, &mut Transform, &mut Player), (Without<PossiblePlacementTag>)>,
     mut commands: Commands,
     game_assets: Res<GameAssets>,
+    current_player: Res<CurrentPlayer>,
     mut next_state: ResMut<NextState<AppState>>,
     mut timer:ResMut<CountDown>
 ){
     match world_cursor.press_state {
         PressState::JustPressed => {
-            for (entity, transform, mut state) in &mut q_placable_tiles {
+            for (entity, transform, mut player) in &mut q_placable_tiles {
+
+                if *player != current_player.player{
+                    continue;
+                }
+
                 let max_distance = 50.;
                 let distance_to_cursor = world_cursor.position.distance(Vec2::new(transform.translation.x, transform.translation.y));
 
