@@ -2,6 +2,7 @@
 //! into a texture atlas, and changing the displayed image periodically.
 
 use bevy::ecs::query::QueryEntityError;
+use bevy::math::vec3;
 use bevy::prelude::*;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::utils::hashbrown::Equivalent;
@@ -43,9 +44,10 @@ fn setup_assets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut asset_server: Res<AssetServer>
 ) {
-    let red_material = materials.add(Color::LinearRgba(LinearRgba::new(1.0, 0.0, 0.0,1.0).into()));
-    let white_material = materials.add(Color::LinearRgba(LinearRgba::new(1.0, 1.0, 1.0,1.0).into()));
+    let red_material = materials.add(Color::LinearRgba(LinearRgba::new(1.0, 0.0, 0.0, 1.0).into()));
+    let white_material = materials.add(Color::LinearRgba(LinearRgba::new(1.0, 1.0, 1.0, 1.0).into()));
     let grey_material = materials.add(Color::LinearRgba(LinearRgba::new(0.2, 0.2, 0.2, 1.0).into()));
 
     let color_materials = ColorMaterials {
@@ -55,9 +57,11 @@ fn setup_assets(
     };
 
     let mesh = Mesh2dHandle(meshes.add(RegularPolygon::new(50.0, 6)));
+    let sprites = Sprites { ant: asset_server.load("ant.png"), queen: asset_server.load("bee.png") };
 
-    commands.insert_resource(GameAssets{ color_materials, mesh });
+    commands.insert_resource(GameAssets { color_materials, mesh, sprites });
 }
+
 fn setup(
     mut commands: Commands,
     game_assets: Res<GameAssets>,
@@ -80,15 +84,18 @@ fn setup(
 
 fn s_build_cache(
     mut position_cache: ResMut<PositionCache>,
-    mut TileQueue: Query<(Entity,&HexCoordinate),(With<HiveTileTag>)>,
+    mut TileQueue: Query<(Entity,&HexCoordinate,&HiveTileTag)>,
 ) {
     position_cache.0.clear();
 
-    for tile in TileQueue.iter() {
-        if position_cache.0.contains_key(tile.1){
+    for (entity, hex, hive_tile) in TileQueue.iter() {
+        if let Some(_)= hive_tile.tile_on_top{
+            continue;
+        }
+        if position_cache.0.contains_key(hex){
             panic!();
         }
-        position_cache.0.insert(*tile.1, tile.0.clone());
+        position_cache.0.insert(*hex, entity.clone());
     }
 }
 
@@ -99,10 +106,10 @@ fn s_cleanup_tile_placement(
     mut commands: Commands,
 ) {
     for entity in &q_possible_placements {
-        commands.entity(entity).despawn();
+        commands.entity(entity).despawn_recursive();
     }
     for entity in &q_placable_tiles {
-        commands.entity(entity).despawn();
+        commands.entity(entity).despawn_recursive();
     }
 
     for (mut transform,hex) in &mut q_transforms_with_hex_coord{
@@ -262,9 +269,17 @@ fn s_spawn_tiles_from_inventory(
             ..default()
         },
         player:player.clone(),
-        placable_tile_tag: PlacableTileState {selected: false}
+        placable_tile_tag: PlacableTileState {selected: false, insect: Insect::Ant }
     };
-    commands.spawn(bundle);
+
+    let child = commands.spawn(SpriteBundle {
+        texture: game_assets.sprites.queen.clone(),
+        transform: Transform::from_scale(vec3(0.15,0.15,0.15)).with_translation(Vec3::new(0.0f32, 0.0f32, 10.0f32)),
+        ..default()
+    }).id();
+
+    let parent = commands.spawn(bundle).id();
+    commands.entity(parent).push_children(&[child]);
 }
 
 /*
@@ -339,6 +354,7 @@ fn s_move_tile(
    // mut q_transform:  Query<(&mut Transform)>,
     mut q_possible_placements:  Query<(&mut Transform), Without<PossiblePlacementTag>>,
     mut m_placement_markers:  Query<(&Transform, &HexCoordinate, &PossiblePlacementTag)>,
+    mut q_placable_tile_state : Query<&PlacableTileState>,
     mut commands: Commands,
     selected_tile: Res<SelectedTile>,
     game_assets: Res<GameAssets>,
@@ -366,7 +382,13 @@ fn s_move_tile(
 
                         // commands.spawn(HiveTile::new(*hex_coordinate, &game_assets, current_player.player));
 
-                        commands.entity(selected_entity).insert(HiveTileTag {}).insert(hex_coordinate.clone()).remove::<PlacableTileState>();
+                        match q_placable_tile_state.get(selected_entity) {
+                            Ok(state) => {
+                                commands.entity(selected_entity).insert(HiveTileTag { tile_on_top: None, insect: state.insect }).insert(hex_coordinate.clone()).remove::<PlacableTileState>();
+                            }
+                            Err(_) => { commands.entity(selected_entity).insert(hex_coordinate.clone());}
+                        }
+
 
                         next_state.set(AppState::MoveFinished);
 

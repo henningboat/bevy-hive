@@ -1,5 +1,5 @@
-use bevy::prelude::{Bundle, ColorMaterial, Component, default, Entity, Resource, States};
-use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+use bevy::prelude::{Bundle, ColorMaterial, Component, default, Entity, Image, Resource, States};
+use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle, Sprite};
 use std::collections::HashMap;
 use bevy::asset::Handle;
 use crate::hex_coordinate::HexCoordinate;
@@ -39,6 +39,7 @@ pub struct CurrentPlayer {
 #[derive(Resource)]
 pub struct GameAssets {
     pub(crate) color_materials: ColorMaterials,
+    pub(crate) sprites: Sprites,
     pub(crate) mesh:Mesh2dHandle,
 }
 
@@ -47,6 +48,11 @@ pub struct ColorMaterials {
     pub(crate) red: Handle<ColorMaterial>,
     pub(crate) white: Handle<ColorMaterial>,
     pub(crate) grey: Handle<ColorMaterial>,
+}
+#[derive(Resource)]
+pub struct Sprites {
+    pub(crate) ant: Handle<Image>,
+    pub(crate) queen: Handle<Image>,
 }
 
 #[derive(Resource,Default)]
@@ -73,6 +79,7 @@ enum MyGameModeState {
 #[derive(Component, Default)]
 pub struct PlacableTileState {
     pub(crate) selected:bool,
+    pub insect: Insect
 }
 
 #[derive(Component, Default)]
@@ -80,8 +87,17 @@ pub struct PossiblePlacementTag {
     selected:bool,
 }
 
+#[derive(Default, Copy,Clone)]
+pub enum Insect{
+    #[default]
+    Ant,
+    Queen,
+}
+
 #[derive(Component, Default)]
 pub struct HiveTileTag {
+    pub(crate) tile_on_top : Option<Entity>,
+    pub insect: Insect,
 }
 
 #[derive(Bundle)]
