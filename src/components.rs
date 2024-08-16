@@ -2,6 +2,7 @@ use bevy::prelude::{Bundle, ColorMaterial, Component, default, Entity, Image, Re
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle, Sprite};
 use std::collections::HashMap;
 use bevy::asset::Handle;
+use crate::components::Insect::{Ant, Queen};
 use crate::hex_coordinate::HexCoordinate;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
@@ -55,6 +56,15 @@ pub struct Sprites {
     pub(crate) queen: Handle<Image>,
 }
 
+impl Sprites {
+    pub(crate) fn get(&self, insect: Insect) -> Handle<Image> {
+        match insect {
+            Insect::Ant => self.ant.clone(),
+            Insect::Queen =>self.queen.clone()
+        }
+    }
+}
+
 #[derive(Resource,Default)]
 pub struct PositionCache(pub(crate) HashMap<HexCoordinate, Entity>);
 
@@ -79,7 +89,6 @@ enum MyGameModeState {
 #[derive(Component, Default)]
 pub struct PlacableTileState {
     pub(crate) selected:bool,
-    pub insect: Insect
 }
 
 #[derive(Component, Default)]
@@ -87,24 +96,26 @@ pub struct PossiblePlacementTag {
     selected:bool,
 }
 
-#[derive(Default, Copy,Clone)]
+#[derive(Component,Default, Copy,Clone,PartialEq)]
 pub enum Insect{
     #[default]
     Ant,
     Queen,
 }
 
+
+
 #[derive(Component, Default)]
 pub struct HiveTileTag {
     pub(crate) tile_on_top : Option<Entity>,
-    pub insect: Insect,
 }
 
 #[derive(Bundle)]
 pub struct PlacableTile {
     pub(crate) renderer: MaterialMesh2dBundle<ColorMaterial>,
     pub(crate) player: Player,
-    pub(crate) placable_tile_tag: PlacableTileState
+    pub(crate) placable_tile_tag: PlacableTileState,
+    pub(crate)  insect: Insect
 }
 
 #[derive(Bundle)]
@@ -121,23 +132,16 @@ pub struct HiveTile {
     coordinate: HexCoordinate,
     player: Player,
     hive_tile_tag:HiveTileTag,
+    insect: Insect,
 }
 
- impl HiveTile{
-    pub(crate) fn new(position : HexCoordinate, game_assets: &GameAssets, player: Player) ->HiveTile{
-        let material = match player {
-            Player::Player1 => {game_assets.color_materials.white.clone()}
-            Player::Player2 => {game_assets.color_materials.red.clone()}
-        };
-        HiveTile{ renderer: MaterialMesh2dBundle {
-            mesh:game_assets.mesh.clone(),
-            material,
-            transform: position.get_transform(0.),
-            ..default()
-        },
-            coordinate: position,
-            player,
-            hive_tile_tag: Default::default(),
-        }
+#[derive(Component)]
+pub struct PlayerInventory{
+    pub pieces:Vec<Insect>
+}
+
+impl PlayerInventory {
+    pub(crate) fn new()->PlayerInventory {
+        PlayerInventory{ pieces: vec![Ant,Ant,Ant,Queen] }
     }
 }

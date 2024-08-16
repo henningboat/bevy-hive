@@ -1,6 +1,7 @@
 //! Renders an animated sprite by loading all animation frames from a single image (a sprite sheet)
 //! into a texture atlas, and changing the displayed image periodically.
 
+use std::ops::Index;
 use bevy::ecs::query::QueryEntityError;
 use bevy::math::vec3;
 use bevy::prelude::*;
@@ -9,14 +10,15 @@ use bevy::utils::hashbrown::Equivalent;
 use bevy::utils::HashSet;
 use components::*;
 use hex_coordinate::HexCoordinate;
-use crate::hex_coordinate::ALL_DIRECTIONS;
 use components::Player::Player1;
 use crate::components::{HiveTile, SelectedTile};
+use crate::components::Player::Player2;
 use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
 
 mod hex_coordinate;
 mod world_cursor;
 mod components;
+mod rules;
 
 fn main() {
     App::new().add_plugins((DefaultPlugins, WorldCursorPlugin))
@@ -26,7 +28,7 @@ fn main() {
          .add_systems(Update, s_build_cache)
          .add_systems(OnEnter(AppState::Idle), s_spawn_tiles_from_inventory)
         .add_systems(Update, s_update_idle.after(s_build_cache).run_if(in_state(AppState::Idle)))
-         .add_systems(OnEnter(AppState::MovingTile), s_spawn_placement_markers)
+         .add_systems(OnEnter(AppState::MovingTile), rules::s_spawn_placement_markers)
          .add_systems(Update, s_move_tile.after(s_build_cache).run_if(in_state(AppState::MovingTile)))
          .add_systems(OnExit(AppState::MovingTile), s_cleanup_tile_placement)
         .add_systems(OnEnter(AppState::MoveFinished), s_enter_move_finished)
@@ -80,6 +82,11 @@ fn setup(
         hex_coordinate: origin,
     };
     commands.spawn(bundle);
+
+    commands.spawn((PlayerInventory::new(), Player1));
+    commands.spawn((PlayerInventory::new(), Player2));
+
+
 }
 
 fn s_build_cache(
@@ -122,198 +129,61 @@ fn s_enter_move_finished(
     mut current_player:ResMut<CurrentPlayer>
 ) {
     match current_player.player {
-        Player::Player1 => {current_player.player=Player::Player2}
-        Player::Player2 => {current_player.player=Player::Player1}
+        Player1 => {current_player.player=Player2}
+        Player2 => {current_player.player=Player1}
     }
     next_state.set(AppState::Idle);
 }
-fn s_spawn_placement_markers(
-    time:Res<Time>,
-    mut position_cache: Res<PositionCache>,
-    q_player:Query<&Player, With<HiveTileTag>>,
-    q_hex_coord:Query<&HexCoordinate, With<HiveTileTag>>,
-    q_is_hive_tile:Query<(), With<HiveTileTag>>,
-    game_assets : Res<GameAssets>,
-    current_player: Res<CurrentPlayer>,
-    selected_tile: Res<SelectedTile>,
-    mut commands: Commands,
-) {
-    let is_existing_tile = q_is_hive_tile.contains(selected_tile.0) ;
 
-    if is_existing_tile {
-        //determine if the piece can be moved at all
-        let mut checked_tiles: HashSet<HexCoordinate> = HashSet::new();
-        let mut open_list:Vec<HexCoordinate> = vec![];
-        let mut connected_tiles=vec![];
-
-        let all_positions: Vec<_> = position_cache.0.keys().collect();
-        if (all_positions.len() > 0) {
-            open_list.push(all_positions[0].clone());
-
-            loop {
-                if open_list.len() == 0 {
-                    break;
-                }
-
-                let position = open_list.pop().unwrap();
-
-                if checked_tiles.contains(&position){
-                    continue;
-                }
-                checked_tiles.insert(position);
-
-                if !position_cache.0.contains_key(&position){
-                    continue;
-                }
-
-                //we ignore the currently selected piece
-                if &position == q_hex_coord.get(selected_tile.0).unwrap(){
-                    continue;
-                }
-
-                connected_tiles.push(position);
-
-                for DIRECTION in ALL_DIRECTIONS {
-                    let relative = position.get_relative(DIRECTION);
-                    if checked_tiles.contains(&relative){
-                        continue;
-                    }
-                    open_list.push(relative);
-                }
-            }
-
-            if connected_tiles.len() != all_positions.len()-1{
-                return;
-            }
-        }
-    }
-    //  spawn placement markers
-    let mut already_checked= HashSet::new();
-    for (position, entity) in &position_cache.0 {
-        if entity.equivalent(&selected_tile.0.clone()){
-            continue;
-        }
-
-        for position_to_check in ALL_DIRECTIONS.map(|x|position.get_relative(x)) {
-            if already_checked.contains(&position_to_check){
-                continue;
-            }
-
-            already_checked.insert(position_to_check);
-
-            if(position_cache.0.contains_key(&position_to_check)){
-                continue;
-            }
-
-
-            if !is_existing_tile {
-                let mut touched_other_player = false;
-
-                if q_player.iter().any(|player| *player == current_player.player) {
-                    for surrounding in ALL_DIRECTIONS.map(|x| position_to_check.get_relative(x)) {
-                        match position_cache.0.get(&surrounding) {
-                            None => {}
-                            Some(e) => {
-                                let x1 = q_player.get(*e).unwrap();
-                                if *x1 != current_player.player {
-                                    touched_other_player = true;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if touched_other_player {
-                    continue;
-                }
-            }
-
-            let bundle = PossiblePlacementMarker {
-                renderer: MaterialMesh2dBundle {
-                    mesh: game_assets.mesh.clone(),
-                    material:game_assets.color_materials.grey.clone(),
-                    transform: position_to_check.get_transform(-2.),
-                    ..default()
-                },
-                possible_placement_tag: Default::default(),
-                hex_coordinate: position_to_check,
-            };
-            commands.spawn(bundle);
-
-            if position_cache.0.contains_key(&position_to_check){
-                continue;
-            }
-        }
-    }
-}
 
 fn s_spawn_tiles_from_inventory(
     time:Res<Time>,
-    mut position_cache: Res<PositionCache>,
+    q_inventory:Query<(&PlayerInventory,&Player)>,
     game_assets : Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
     mut commands: Commands,
 ) {
-    let player = &current_player.player.clone();
-    let material = match player {
-        Player::Player1 => { game_assets.color_materials.white.clone() }
-        Player::Player2 => { game_assets.color_materials.red.clone() }
-    };
-    let position = Transform::from_translation(Vec3::new(0., -300., 0.));
-
-    let bundle = PlacableTile {
-        renderer: MaterialMesh2dBundle {
-            mesh: game_assets.mesh.clone(),
-            material,
-            transform: position,
-            ..default()
-        },
-        player:player.clone(),
-        placable_tile_tag: PlacableTileState {selected: false, insect: Insect::Ant }
-    };
-
-    let child = commands.spawn(SpriteBundle {
-        texture: game_assets.sprites.queen.clone(),
-        transform: Transform::from_scale(vec3(0.15,0.15,0.15)).with_translation(Vec3::new(0.0f32, 0.0f32, 10.0f32)),
-        ..default()
-    }).id();
-
-    let parent = commands.spawn(bundle).id();
-    commands.entity(parent).push_children(&[child]);
-}
-
-/*
-
-Wp    //  spawn placement markers
-    let mut already_checked= HashSet::new();
-    for (position, _) in &position_cache.0 {
-        for position_to_check in ALL_DIRECTIONS.map(|x|position.get_relative(x)) {
-            if already_checked.contains(&position_to_check){
-                continue;
-            }
-
-            already_checked.insert(position_to_check);
-
-
-            let bundle = PossiblePlacementMarker {
-                renderer: MaterialMesh2dBundle {
-                    mesh: game_assets.mesh.clone(),
-                    material:game_assets.color_materials.grey.clone(),
-                    transform: position_to_check.get_transform(-2.),
-                    ..default()
-                },
-                possible_placement_tag: Default::default(),
-                hex_coordinate: position_to_check,
-            };
-            commands.spawn(bundle);
-
-            if position_cache.0.contains_key(&position_to_check){
-                continue;
-            }
+    let current_player = &current_player.player.clone();
+    let mut inventory = None;
+    for (i, player) in &q_inventory {
+        if player== current_player{
+            inventory=Some(i);
         }
     }
 
- */
+    let mut offset = 0.0;
+
+    for insect in inventory.unwrap().pieces.clone() {
+        let material = match current_player {
+            Player1 => { game_assets.color_materials.white.clone() }
+            Player2 => { game_assets.color_materials.red.clone() }
+        };
+        let position = Transform::from_translation(Vec3::new(offset, -300., 0.));
+
+        let bundle = PlacableTile {
+            renderer: MaterialMesh2dBundle {
+                mesh: game_assets.mesh.clone(),
+                material,
+                transform: position,
+                ..default()
+            },
+            player:current_player.clone(),
+            placable_tile_tag: PlacableTileState {selected: false },
+            insect
+        };
+
+        let child = commands.spawn(SpriteBundle {
+            texture: game_assets.sprites.get(insect),
+            transform: Transform::from_scale(vec3(0.15,0.15,0.15)).with_translation(Vec3::new(0.0f32, 0.0f32, 10.0f32)),
+            ..default()
+        }).id();
+
+        let parent = commands.spawn(bundle).id();
+        commands.entity(parent).push_children(&[child]);
+
+        offset+=100.;
+    }
+}
 
 fn s_update_idle(
     world_cursor: Res<WorldCursor>,
@@ -355,6 +225,8 @@ fn s_move_tile(
     mut q_possible_placements:  Query<(&mut Transform), Without<PossiblePlacementTag>>,
     mut m_placement_markers:  Query<(&Transform, &HexCoordinate, &PossiblePlacementTag)>,
     mut q_placable_tile_state : Query<&PlacableTileState>,
+    mut q_inventory : Query<(& mut PlayerInventory, &Player)>,
+    mut q_insect : Query<(& Insect)>,
     mut commands: Commands,
     selected_tile: Res<SelectedTile>,
     game_assets: Res<GameAssets>,
@@ -384,7 +256,21 @@ fn s_move_tile(
 
                         match q_placable_tile_state.get(selected_entity) {
                             Ok(state) => {
-                                commands.entity(selected_entity).insert(HiveTileTag { tile_on_top: None, insect: state.insect }).insert(hex_coordinate.clone()).remove::<PlacableTileState>();
+                                let current_player = &current_player.player.clone();
+
+                                for (mut i, player) in & mut q_inventory {
+                                    if player== current_player{
+
+                                        let mut new_pieces = i.pieces.clone();
+
+                                        new_pieces.remove(new_pieces.iter().position(|i|i==q_insect.get(selected_entity).unwrap()).unwrap());
+                                        
+                                        i.pieces= new_pieces;
+                                    }
+                                }
+
+
+                                commands.entity(selected_entity).insert(HiveTileTag { tile_on_top: None }).insert(hex_coordinate.clone()).remove::<PlacableTileState>();
                             }
                             Err(_) => { commands.entity(selected_entity).insert(hex_coordinate.clone());}
                         }

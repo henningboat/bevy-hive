@@ -1,5 +1,6 @@
 use bevy::prelude::{Component, Transform};
 use bevy::math::Vec3;
+use crate::components::Insect;
 
 #[derive(Component, Default, Copy, Clone, Hash, Debug)]
 #[derive(Eq, PartialEq)]
@@ -33,6 +34,7 @@ impl HexCoordinate {
 
 }
 pub const ALL_DIRECTIONS: [&'static HexDirection; 6] = [&HexDirection::UpRight,&HexDirection::Right,&HexDirection::DownRight, &HexDirection::DownLeft,&HexDirection::Left,&HexDirection::UpLeft,];
+pub const ALL_INSECTS: [&'static Insect; 2] = [&Insect::Ant,&Insect::Queen];
 
 
 #[derive(Debug)]
