@@ -37,6 +37,7 @@ pub fn s_spawn_placement_markers(
         valid_moves = match insect_type {
             InsectType::Ant => { get_moves_for_ant(position_cache_without_selected, selected_tile_position) }
             InsectType::Queen => { get_moves_for_queen(position_cache_without_selected, selected_tile_position) }
+            InsectType::Spider => {get_moves_for_spider(position_cache_without_selected, selected_tile_position) }
         }
     }
 
@@ -63,7 +64,7 @@ fn get_moves_for_ant(position_cache: PositionCache, start_position: HexCoordinat
     let mut possible_moves =  position_cache.get_surrounding_slidable_tiles(start_position, &vec![]);
 
     loop {
-       let mut new_moves = vec![];
+        let mut new_moves = vec![];
 
         let mut ignore = possible_moves.clone();
         ignore.push(start_position);
@@ -81,6 +82,36 @@ fn get_moves_for_ant(position_cache: PositionCache, start_position: HexCoordinat
 
         for new_move in new_moves {
             possible_moves.push(new_move);
+        }
+    }
+
+    possible_moves
+}
+
+
+fn get_moves_for_spider(position_cache: PositionCache, start_position: HexCoordinate) -> Vec<HexCoordinate> {
+    let mut possible_moves =  position_cache.get_surrounding_slidable_tiles(start_position, &vec![]);
+
+    let mut ignore = possible_moves.clone();
+    ignore.push(start_position);
+    
+    for _ in 0..2 {
+        let mut new_moves = vec![];
+
+        for existing_move in &possible_moves {
+            for new_move in position_cache.get_surrounding_slidable_tiles(*existing_move, &ignore)
+            {
+                new_moves.push(new_move);
+            }
+        }
+
+        if new_moves.len() == 0{
+            break;
+        }
+
+        possible_moves = new_moves.clone();
+        for new_move in &new_moves {
+            ignore.push(*new_move);
         }
     }
 

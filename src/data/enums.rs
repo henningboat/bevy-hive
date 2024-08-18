@@ -39,4 +39,5 @@ pub enum InsectType {
     #[default]
     Ant,
     Queen,
+    Spider
 }

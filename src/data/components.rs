@@ -5,6 +5,7 @@ use bevy::asset::Handle;
 use crate::data::enums::{InsectType, Player};
 use crate::data::enums::InsectType::{Ant, Queen};
 use crate::hex_coordinate::{ALL_DIRECTIONS, HexCoordinate};
+use crate::Spider;
 
 #[derive(Resource,Copy,Clone)]
 pub struct CurrentPlayer {
@@ -28,13 +29,15 @@ pub struct ColorMaterials {
 pub struct Sprites {
     pub(crate) ant: Handle<Image>,
     pub(crate) queen: Handle<Image>,
+    pub(crate) spider: Handle<Image>,
 }
 
 impl Sprites {
     pub(crate) fn get(&self, insect: InsectType) -> Handle<Image> {
         match insect {
             InsectType::Ant => self.ant.clone(),
-            InsectType::Queen =>self.queen.clone()
+            InsectType::Queen =>self.queen.clone(),
+            InsectType::Spider =>self.spider.clone(),
         }
     }
 }
@@ -144,6 +147,6 @@ pub struct PlayerInventory {
 
 impl PlayerInventory {
     pub(crate) fn new()->PlayerInventory {
-        PlayerInventory { pieces: vec![Ant, Ant, Ant, Queen], moves_played: 0 }
+        PlayerInventory { pieces: vec![Ant, Ant, Ant, Queen, Spider, Spider], moves_played: 0 }
     }
 }
