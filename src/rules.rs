@@ -29,15 +29,23 @@ pub fn s_spawn_placement_markers(
 
         valid_moves=get_moves_for_new_piece(position_cache, current_player.player , !player_has_tile_in_game);
     }else {
+        
         let insect_type = q_insect.get(selected_tile.0).unwrap();
 
         let selected_tile_position = *q_hex_coord.get(selected_tile.0).unwrap();
 
         let position_cache_without_selected = position_cache.get_without(&selected_tile_position);
+
+
+        if !check_moving_piece_allowed(&position_cache_without_selected){
+            return;
+        }
+        
         valid_moves = match insect_type {
             InsectType::Ant => { get_moves_for_ant(position_cache_without_selected, selected_tile_position) }
             InsectType::Queen => { get_moves_for_queen(position_cache_without_selected, selected_tile_position) }
             InsectType::Spider => {get_moves_for_spider(position_cache_without_selected, selected_tile_position) }
+            InsectType::Grasshopper => {get_moves_for_grasshopper(position_cache_without_selected, selected_tile_position) }
         }
     }
 
@@ -58,6 +66,33 @@ pub fn s_spawn_placement_markers(
 
 fn get_moves_for_queen(position_cache: PositionCache, current_position: HexCoordinate) -> Vec<HexCoordinate> {
     position_cache.get_surrounding_slidable_tiles(current_position, &vec![])
+}
+
+fn get_moves_for_grasshopper(position_cache: PositionCache, start_position: HexCoordinate) -> Vec<HexCoordinate> {
+    let mut possible_moves= vec![];
+    
+    for DIRECTION in ALL_DIRECTIONS {
+        let mut position = start_position;
+        let mut at_lest_one_jump=false;
+        loop {
+            let new_position = position.get_relative(DIRECTION);
+        
+            if !position_cache.0.contains_key(&new_position){
+
+                if new_position!= start_position && at_lest_one_jump {
+                    possible_moves.push(new_position);
+                }
+                
+                break;
+            }
+            
+            position=new_position;
+            at_lest_one_jump=true;
+        }
+    }
+    
+    possible_moves
+    
 }
 
 fn get_moves_for_ant(position_cache: PositionCache, start_position: HexCoordinate) -> Vec<HexCoordinate> {
@@ -162,9 +197,8 @@ fn get_moves_for_new_piece(position_cache: Res<PositionCache>, current_player: P
     valid_moves
 }
 
-fn check_moving_piece_allowed(position_cache: &Res<PositionCache>, q_hex_coord: Query<&HexCoordinate, With<IsInGame>>, selected_tile: &Res<SelectedTile>) -> bool {
-    let ignore_list = vec![*q_hex_coord.get(selected_tile.0).unwrap()];
-    //determine if the piece can be moved at all
+fn check_moving_piece_allowed(position_cache: &PositionCache) -> bool {
+    
     let mut checked_tiles: HashSet<HexCoordinate> = HashSet::new();
     let mut open_list: Vec<HexCoordinate> = vec![];
     let mut connected_tiles = vec![];
@@ -189,10 +223,6 @@ fn check_moving_piece_allowed(position_cache: &Res<PositionCache>, q_hex_coord: 
                 continue;
             }
 
-            //we ignore the currently selected piece
-            if ignore_list.contains(&position) {
-                continue;
-            }
 
             connected_tiles.push(position);
 
@@ -206,7 +236,7 @@ fn check_moving_piece_allowed(position_cache: &Res<PositionCache>, q_hex_coord: 
         }
     }
 
-    if connected_tiles.len() != all_positions.len() - 1 {
+    if connected_tiles.len() == all_positions.len(){
         return true;
     }
     false

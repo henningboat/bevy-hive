@@ -60,7 +60,12 @@ fn setup_assets(
     };
 
     let mesh = Mesh2dHandle(meshes.add(RegularPolygon::new(50.0, 6)));
-    let sprites = Sprites { ant: asset_server.load("ant.png"), queen: asset_server.load("bee.png"),spider:asset_server.load("spider.png") };
+    let sprites = Sprites {
+        ant: asset_server.load("ant.png"),
+        queen: asset_server.load("bee.png"),
+        spider:asset_server.load("spider.png"),
+        grasshopper:asset_server.load("grasshopper.png")
+    };
 
     commands.insert_resource(GameAssets { color_materials, mesh, sprites });
 }
