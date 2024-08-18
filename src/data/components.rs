@@ -39,8 +39,14 @@ impl Sprites {
     }
 }
 
+pub struct PositionCacheEntry{
+    pub(crate) player: Player,
+    pub(crate) insect_type: InsectType,
+    pub(crate) entity: Entity
+}
+
 #[derive(Resource,Default)]
-pub struct PositionCache(pub(crate) HashMap<HexCoordinate, Entity>);
+pub struct PositionCache(pub(crate) HashMap<HexCoordinate, PositionCacheEntry>);
 
 #[derive(Resource,Default)]
 pub struct CountDown(pub(crate) f32);

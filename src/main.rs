@@ -10,7 +10,7 @@ use bevy::utils::hashbrown::Equivalent;
 use bevy::utils::HashSet;
 use data::*;
 use hex_coordinate::HexCoordinate;
-use crate::data::components::{ColorMaterials, CountDown, CurrentPlayer, GameAssets, IsInGame, MainCamera, HiveTile, PlacableTileState, PlayerInventory, PositionCache, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites};
+use crate::data::components::{ColorMaterials, CountDown, CurrentPlayer, GameAssets, IsInGame, MainCamera, HiveTile, PlacableTileState, PlayerInventory, PositionCache, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites, PositionCacheEntry};
 use crate::data::enums::{AppState, InsectType, Player};
 pub use crate::data::enums::InsectType::*;
 use crate::data::enums::Player::{Player1, Player2};
@@ -92,18 +92,18 @@ fn setup(
 
 fn s_build_cache(
     mut position_cache: ResMut<PositionCache>,
-    mut TileQueue: Query<(Entity,&HexCoordinate,&IsInGame)>,
+    mut TileQueue: Query<(Entity,&HexCoordinate,&IsInGame, &Player, &InsectType)>,
 ) {
     position_cache.0.clear();
 
-    for (entity, hex, hive_tile) in TileQueue.iter() {
+    for (entity, hex, hive_tile, player, insect_type) in TileQueue.iter() {
         if let Some(_)= hive_tile.tile_on_top{
             continue;
         }
         if position_cache.0.contains_key(hex){
             panic!();
         }
-        position_cache.0.insert(*hex, entity.clone());
+        position_cache.0.insert(*hex, PositionCacheEntry{entity, player:player.clone(), insect_type:insect_type.clone()});
     }
 }
 

@@ -33,8 +33,8 @@ pub fn s_spawn_placement_markers(
     };
     //  spawn placement markers
     let mut already_checked= HashSet::new();
-    for (position, entity) in &position_cache.0 {
-        if entity.equivalent(&selected_tile.0.clone()){
+    for (position, entry) in &position_cache.0 {
+        if entry.entity.equivalent(&selected_tile.0.clone()){
             continue;
         }
 
@@ -55,10 +55,10 @@ pub fn s_spawn_placement_markers(
 
                 if q_player.iter().any(|player| *player == current_player.player) {
                     for surrounding in ALL_DIRECTIONS.map(|x| position_to_check.get_relative(x)) {
-                        match position_cache.0.get(&surrounding) {
+                        match position_cache.0.get(&surrounding){
                             None => {}
                             Some(e) => {
-                                let x1 = q_player.get(*e).unwrap();
+                                let x1 = q_player.get(e.entity).unwrap();
                                 if *x1 != current_player.player.clone() {
                                     touched_other_player = true;
                                 }

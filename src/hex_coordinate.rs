@@ -37,7 +37,7 @@ pub const ALL_DIRECTIONS: [&'static HexDirection; 6] = [&HexDirection::UpRight,&
 pub const ALL_INSECTS: [&'static InsectType; 2] = [&InsectType::Ant,&InsectType::Queen];
 
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum HexDirection {
     UpRight,
     Right,
@@ -46,3 +46,10 @@ pub enum HexDirection {
     Left,
     UpLeft
 }
+
+// impl HexDirection {
+//     pub(crate) fn get_adjacent_directions(&self) -> [&HexDirection; 2] {
+//         let index = ALL_DIRECTIONS.iter().position(self).unwrap();
+//         return [ALL_DIRECTIONS[(index + 5) % 6], ALL_DIRECTIONS[(index + 1) % 6]];
+//     }
+// }
