@@ -2,39 +2,13 @@ use bevy::prelude::{Bundle, ColorMaterial, Component, default, Entity, Image, Re
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle, Sprite};
 use std::collections::HashMap;
 use bevy::asset::Handle;
-use crate::components::Insect::{Ant, Queen};
+use crate::data::enums::{InsectType, Player};
+use crate::data::enums::InsectType::{Ant, Queen};
 use crate::hex_coordinate::HexCoordinate;
-
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
-pub enum AppState {
-    #[default]
-    Init,
-    Idle,
-    MovingTile,
-    Aborting,
-    MoveFinished,
-    PlayerWon
-}
-
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
-enum TilePlacementState {
-    #[default]
-    Waiting,
-    Moving,
-    Dropped,
-    Placed
-}
-
-
-#[derive(Component, Clone, Copy, PartialEq)]
-pub enum Player{
-    Player1,
-    Player2
-}
 
 #[derive(Resource,Copy,Clone)]
 pub struct CurrentPlayer {
-    pub(crate) player :Player
+    pub(crate) player :Player,
 }
 
 #[derive(Resource)]
@@ -57,10 +31,10 @@ pub struct Sprites {
 }
 
 impl Sprites {
-    pub(crate) fn get(&self, insect: Insect) -> Handle<Image> {
+    pub(crate) fn get(&self, insect: InsectType) -> Handle<Image> {
         match insect {
-            Insect::Ant => self.ant.clone(),
-            Insect::Queen =>self.queen.clone()
+            InsectType::Ant => self.ant.clone(),
+            InsectType::Queen =>self.queen.clone()
         }
     }
 }
@@ -78,13 +52,6 @@ pub struct SelectedTile(pub Entity);
 #[derive(Component)]
 pub struct MainCamera;
 
-#[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
-enum MyGameModeState {
-    #[default]
-    PlayersTurn,
-    PlacingNewPiece
-}
-
 
 #[derive(Component, Default)]
 pub struct PlacableTileState {
@@ -96,17 +63,9 @@ pub struct PossiblePlacementTag {
     selected:bool,
 }
 
-#[derive(Component,Default, Copy,Clone,PartialEq)]
-pub enum Insect{
-    #[default]
-    Ant,
-    Queen,
-}
-
-
 
 #[derive(Component, Default)]
-pub struct HiveTileTag {
+pub struct IsInGame {
     pub(crate) tile_on_top : Option<Entity>,
 }
 
@@ -115,7 +74,7 @@ pub struct PlacableTile {
     pub(crate) renderer: MaterialMesh2dBundle<ColorMaterial>,
     pub(crate) player: Player,
     pub(crate) placable_tile_tag: PlacableTileState,
-    pub(crate)  insect: Insect
+    pub(crate)  insect: InsectType
 }
 
 #[derive(Bundle)]
@@ -131,17 +90,18 @@ pub struct HiveTile {
     renderer: MaterialMesh2dBundle<ColorMaterial>,
     coordinate: HexCoordinate,
     player: Player,
-    hive_tile_tag:HiveTileTag,
-    insect: Insect,
+    hive_tile_tag: IsInGame,
+    insect: InsectType,
 }
 
-#[derive(Component)]
-pub struct PlayerInventory{
-    pub pieces:Vec<Insect>
+#[derive(Component, Clone)]
+pub struct PlayerInventory {
+    pub pieces: Vec<InsectType>,
+    pub moves_played: u32,
 }
 
 impl PlayerInventory {
     pub(crate) fn new()->PlayerInventory {
-        PlayerInventory{ pieces: vec![Ant,Ant,Ant,Queen] }
+        PlayerInventory { pieces: vec![Ant, Ant, Ant, Queen], moves_played: 0 }
     }
 }

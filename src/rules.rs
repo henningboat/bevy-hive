@@ -1,17 +1,19 @@
-use bevy::prelude::{Commands, default, Query, Res, Time, With};
+use bevy::prelude::{Commands, default, Entity, Query, Res, Time, With};
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::hashbrown::Equivalent;
 use bevy::utils::HashSet;
-use crate::components::{CurrentPlayer, GameAssets, HiveTileTag, Player, PositionCache, PossiblePlacementMarker, SelectedTile};
+use crate::data::components::{CurrentPlayer, GameAssets, IsInGame, PositionCache, PossiblePlacementMarker, SelectedTile};
+use crate::data::enums::{InsectType, Player};
 use crate::hex_coordinate::{ALL_DIRECTIONS, HexCoordinate};
 use crate::rules;
 
 pub fn s_spawn_placement_markers(
     time:Res<Time>,
     mut position_cache: Res<PositionCache>,
-    q_player:Query<&Player, With<HiveTileTag>>,
-    q_hex_coord:Query<&HexCoordinate, With<HiveTileTag>>,
-    q_is_hive_tile:Query<(), With<HiveTileTag>>,
+    q_player:Query<&Player, With<IsInGame>>,
+    q_insect:Query<&InsectType>,
+    q_hex_coord:Query<&HexCoordinate, With<IsInGame>>,
+    q_is_hive_tile:Query<(), With<IsInGame>>,
     game_assets : Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
     selected_tile: Res<SelectedTile>,
@@ -19,7 +21,8 @@ pub fn s_spawn_placement_markers(
 ) {
 
     let is_new_piece = !q_is_hive_tile.contains(selected_tile.0) ;
-    let insect_type =
+    let insect_type =q_insect.get(selected_tile.0).unwrap();
+
 
     if is_new_piece {
 
@@ -56,7 +59,7 @@ pub fn s_spawn_placement_markers(
                             None => {}
                             Some(e) => {
                                 let x1 = q_player.get(*e).unwrap();
-                                if *x1 != current_player.player {
+                                if *x1 != current_player.player.clone() {
                                     touched_other_player = true;
                                 }
                             }
@@ -88,7 +91,7 @@ pub fn s_spawn_placement_markers(
     }
 }
 
-fn check_moving_piece_allowerd(position_cache: &Res<PositionCache>, q_hex_coord: Query<&HexCoordinate, With<HiveTileTag>>, selected_tile: &Res<SelectedTile>) -> bool {
+fn check_moving_piece_allowerd(position_cache: &Res<PositionCache>, q_hex_coord: Query<&HexCoordinate, With<IsInGame>>, selected_tile: &Res<SelectedTile>) -> bool {
     let ignore_list = vec![*q_hex_coord.get(selected_tile.0).unwrap()];
     //determine if the piece can be moved at all
     let mut checked_tiles: HashSet<HexCoordinate> = HashSet::new();

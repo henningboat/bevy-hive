@@ -3,7 +3,7 @@ use bevy::input::ButtonInput;
 use bevy::math::Vec2;
 use bevy::prelude::{Camera, Camera2dBundle, Commands, Component, GlobalTransform, MouseButton, Query, Res, ResMut, Resource, Window, With};
 use bevy::window::PrimaryWindow;
-use crate::components::MainCamera;
+use crate::data::components::MainCamera;
 use crate::world_cursor::PressState::*;
 
 /// We will store the world position of the mouse cursor here.
