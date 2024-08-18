@@ -1,10 +1,10 @@
-use bevy::prelude::{Bundle, ColorMaterial, Component, default, Entity, Image, Resource, States};
+use bevy::prelude::{Bundle, ColorMaterial, Component, default, Entity, Has, Image, Resource, States};
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle, Sprite};
 use std::collections::HashMap;
 use bevy::asset::Handle;
 use crate::data::enums::{InsectType, Player};
 use crate::data::enums::InsectType::{Ant, Queen};
-use crate::hex_coordinate::HexCoordinate;
+use crate::hex_coordinate::{ALL_DIRECTIONS, HexCoordinate};
 
 #[derive(Resource,Copy,Clone)]
 pub struct CurrentPlayer {
@@ -39,6 +39,7 @@ impl Sprites {
     }
 }
 
+#[derive(Clone)]
 pub struct PositionCacheEntry{
     pub(crate) player: Player,
     pub(crate) insect_type: InsectType,
@@ -47,6 +48,51 @@ pub struct PositionCacheEntry{
 
 #[derive(Resource,Default)]
 pub struct PositionCache(pub(crate) HashMap<HexCoordinate, PositionCacheEntry>);
+
+impl PositionCache {
+    pub fn get_without(&self, without: &HexCoordinate) ->PositionCache {
+
+        let mut new_has_map: HashMap<HexCoordinate, PositionCacheEntry> = HashMap::new();
+
+        for coordinate in self.0.keys() {
+            if coordinate != without{
+                new_has_map.insert(*coordinate, self.0.get(coordinate).unwrap().clone());
+            }
+        }
+
+
+        PositionCache(new_has_map)
+    }
+
+    pub(crate) fn get_surrounding_slidable_tiles(&self, new_position: HexCoordinate, ignore:&Vec<HexCoordinate>) -> Vec<HexCoordinate> {
+        let mut valid_positions = vec![];
+
+        for DIRECTION in ALL_DIRECTIONS {
+            let relative_position = new_position.get_relative(DIRECTION);
+            if self.0.contains_key(&relative_position) {
+                continue;
+            }
+
+            if ignore.contains(&relative_position){
+                continue;
+            }
+
+            let sides = DIRECTION.get_adjacent_directions();
+
+            let mut filled_space_count = 0;
+            for side in sides {
+                if self.0.contains_key(&new_position.get_relative(side)) {
+                    filled_space_count += 1;
+                }
+            }
+            if filled_space_count == 1 {
+                valid_positions.push(relative_position);
+            }
+        }
+
+        valid_positions
+    }
+}
 
 #[derive(Resource,Default)]
 pub struct CountDown(pub(crate) f32);

@@ -47,9 +47,16 @@ pub enum HexDirection {
     UpLeft
 }
 
-// impl HexDirection {
-//     pub(crate) fn get_adjacent_directions(&self) -> [&HexDirection; 2] {
-//         let index = ALL_DIRECTIONS.iter().position(self).unwrap();
-//         return [ALL_DIRECTIONS[(index + 5) % 6], ALL_DIRECTIONS[(index + 1) % 6]];
-//     }
-// }
+impl HexDirection {
+    pub(crate) fn get_adjacent_directions(&self) -> [&HexDirection; 2] {
+
+        let mut index = 0;
+        for i in 0..6 {
+            if ALL_DIRECTIONS[i]==self{
+                index=i;
+            }
+        }
+
+        return [ALL_DIRECTIONS[(index + 5) % 6], ALL_DIRECTIONS[(index + 1) % 6]];
+    }
+}

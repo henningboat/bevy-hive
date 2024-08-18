@@ -1,3 +1,4 @@
+use std::arch::aarch64::vaba_s8;
 use bevy::prelude::{Commands, default, Entity, Query, Res, Time, With};
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::hashbrown::Equivalent;
@@ -19,49 +20,100 @@ pub fn s_spawn_placement_markers(
     selected_tile: Res<SelectedTile>,
     mut commands: Commands,
 ) {
+    let is_new_piece = !q_is_hive_tile.contains(selected_tile.0);
 
-    let is_new_piece = !q_is_hive_tile.contains(selected_tile.0) ;
-    let insect_type =q_insect.get(selected_tile.0).unwrap();
+    let mut valid_moves = vec![];
+    if is_new_piece{
 
+        let player_has_tile_in_game = q_player.iter().any(|p|*p == current_player.player);
 
-    if is_new_piece {
+        valid_moves=get_moves_for_new_piece(position_cache, current_player.player , !player_has_tile_in_game);
+    }else {
+        let insect_type = q_insect.get(selected_tile.0).unwrap();
 
-    }else{
-        if check_moving_piece_allowerd(&position_cache, q_hex_coord, &selected_tile) {
-            return;
+        let selected_tile_position = *q_hex_coord.get(selected_tile.0).unwrap();
+
+        let position_cache_without_selected = position_cache.get_without(&selected_tile_position);
+        valid_moves = match insect_type {
+            InsectType::Ant => { get_moves_for_ant(position_cache_without_selected, selected_tile_position) }
+            InsectType::Queen => { get_moves_for_queen(position_cache_without_selected, selected_tile_position) }
         }
-    };
+    }
+
+    for valid_move in valid_moves {
+        let bundle = PossiblePlacementMarker {
+            renderer: MaterialMesh2dBundle {
+                mesh: game_assets.mesh.clone(),
+                material: game_assets.color_materials.grey.clone(),
+                transform: valid_move.get_transform(-2.),
+                ..default()
+            },
+            possible_placement_tag: Default::default(),
+            hex_coordinate: valid_move,
+        };
+        commands.spawn(bundle);
+    }
+}
+
+fn get_moves_for_queen(position_cache: PositionCache, current_position: HexCoordinate) -> Vec<HexCoordinate> {
+    position_cache.get_surrounding_slidable_tiles(current_position, &vec![])
+}
+
+fn get_moves_for_ant(position_cache: PositionCache, start_position: HexCoordinate) -> Vec<HexCoordinate> {
+    let mut possible_moves =  position_cache.get_surrounding_slidable_tiles(start_position, &vec![]);
+
+    loop {
+       let mut new_moves = vec![];
+
+        let mut ignore = possible_moves.clone();
+        ignore.push(start_position);
+
+        for existing_move in &possible_moves {
+            for new_move in position_cache.get_surrounding_slidable_tiles(*existing_move, &ignore)
+            {
+                new_moves.push(new_move);
+            }
+        }
+
+        if new_moves.len() == 0{
+            break;
+        }
+
+        for new_move in new_moves {
+            possible_moves.push(new_move);
+        }
+    }
+
+    possible_moves
+}
+
+fn get_moves_for_new_piece(position_cache: Res<PositionCache>, current_player: Player, may_touch_other_player:bool) -> Vec<HexCoordinate> {
+
+    let mut valid_moves = vec![];
+
     //  spawn placement markers
-    let mut already_checked= HashSet::new();
+    let mut already_checked = HashSet::new();
     for (position, entry) in &position_cache.0 {
-        if entry.entity.equivalent(&selected_tile.0.clone()){
-            continue;
-        }
-
-        for position_to_check in ALL_DIRECTIONS.map(|x|position.get_relative(x)) {
-            if already_checked.contains(&position_to_check){
+        for position_to_check in ALL_DIRECTIONS.map(|x| position.get_relative(x)) {
+            if already_checked.contains(&position_to_check) {
                 continue;
             }
 
             already_checked.insert(position_to_check);
 
-            if(position_cache.0.contains_key(&position_to_check)){
+            if (position_cache.0.contains_key(&position_to_check)) {
                 continue;
             }
 
 
-            if is_new_piece {
+            if !may_touch_other_player {
                 let mut touched_other_player = false;
-
-                if q_player.iter().any(|player| *player == current_player.player) {
-                    for surrounding in ALL_DIRECTIONS.map(|x| position_to_check.get_relative(x)) {
-                        match position_cache.0.get(&surrounding){
-                            None => {}
-                            Some(e) => {
-                                let x1 = q_player.get(e.entity).unwrap();
-                                if *x1 != current_player.player.clone() {
-                                    touched_other_player = true;
-                                }
+                for surrounding in ALL_DIRECTIONS.map(|x| position_to_check.get_relative(x)) {
+                    match position_cache.0.get(&surrounding) {
+                        None => {}
+                        Some(entry) => {
+                            if entry.player != current_player {
+                                touched_other_player = true;
                             }
                         }
                     }
@@ -72,26 +124,14 @@ pub fn s_spawn_placement_markers(
                 }
             }
 
-            let bundle = PossiblePlacementMarker {
-                renderer: MaterialMesh2dBundle {
-                    mesh: game_assets.mesh.clone(),
-                    material:game_assets.color_materials.grey.clone(),
-                    transform: position_to_check.get_transform(-2.),
-                    ..default()
-                },
-                possible_placement_tag: Default::default(),
-                hex_coordinate: position_to_check,
-            };
-            commands.spawn(bundle);
-
-            if position_cache.0.contains_key(&position_to_check){
-                continue;
-            }
+            valid_moves.push(position_to_check);
         }
     }
+
+    valid_moves
 }
 
-fn check_moving_piece_allowerd(position_cache: &Res<PositionCache>, q_hex_coord: Query<&HexCoordinate, With<IsInGame>>, selected_tile: &Res<SelectedTile>) -> bool {
+fn check_moving_piece_allowed(position_cache: &Res<PositionCache>, q_hex_coord: Query<&HexCoordinate, With<IsInGame>>, selected_tile: &Res<SelectedTile>) -> bool {
     let ignore_list = vec![*q_hex_coord.get(selected_tile.0).unwrap()];
     //determine if the piece can be moved at all
     let mut checked_tiles: HashSet<HexCoordinate> = HashSet::new();
