@@ -10,7 +10,7 @@ use bevy::utils::hashbrown::Equivalent;
 use bevy::utils::HashSet;
 use data::*;
 use hex_coordinate::HexCoordinate;
-use crate::data::components::{ColorMaterials, CountDown, CurrentPlayer, GameAssets, IsInGame, MainCamera, PlacableTile, PlacableTileState, PlayerInventory, PositionCache, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites};
+use crate::data::components::{ColorMaterials, CountDown, CurrentPlayer, GameAssets, IsInGame, MainCamera, HiveTile, PlacableTileState, PlayerInventory, PositionCache, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites};
 use crate::data::enums::{AppState, InsectType, Player};
 pub use crate::data::enums::InsectType::*;
 use crate::data::enums::Player::{Player1, Player2};
@@ -169,7 +169,7 @@ fn s_spawn_tiles_from_inventory(
         };
         let position = Transform::from_translation(Vec3::new(offset, -300., 0.));
 
-        let bundle = PlacableTile {
+        let bundle = HiveTile {
             renderer: MaterialMesh2dBundle {
                 mesh: game_assets.mesh.clone(),
                 material,

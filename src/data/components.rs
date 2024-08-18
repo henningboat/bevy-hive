@@ -70,7 +70,7 @@ pub struct IsInGame {
 }
 
 #[derive(Bundle)]
-pub struct PlacableTile {
+pub struct HiveTile {
     pub(crate) renderer: MaterialMesh2dBundle<ColorMaterial>,
     pub(crate) player: Player,
     pub(crate) placable_tile_tag: PlacableTileState,
@@ -82,16 +82,6 @@ pub struct PossiblePlacementMarker {
     pub(crate) renderer: MaterialMesh2dBundle<ColorMaterial>,
     pub(crate) possible_placement_tag: PossiblePlacementTag,
     pub(crate) hex_coordinate: HexCoordinate
-}
-
-
-#[derive(Bundle)]
-pub struct HiveTile {
-    renderer: MaterialMesh2dBundle<ColorMaterial>,
-    coordinate: HexCoordinate,
-    player: Player,
-    hive_tile_tag: IsInGame,
-    insect: InsectType,
 }
 
 #[derive(Component, Clone)]
