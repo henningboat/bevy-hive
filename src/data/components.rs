@@ -48,7 +48,6 @@ impl Sprites {
 pub struct PositionCacheEntry{
     pub(crate) player: Player,
     pub(crate) insect_type: InsectType,
-    pub(crate) entity: Entity
 }
 
 #[derive(Resource,Default)]

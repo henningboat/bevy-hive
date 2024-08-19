@@ -108,7 +108,7 @@ fn s_build_cache(
         if position_cache.0.contains_key(hex){
             panic!();
         }
-        position_cache.0.insert(*hex, PositionCacheEntry{entity, player:player.clone(), insect_type:insect_type.clone()});
+        position_cache.0.insert(*hex, PositionCacheEntry{player:player.clone(), insect_type:insect_type.clone()});
     }
 }
 
