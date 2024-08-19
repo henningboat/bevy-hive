@@ -11,7 +11,6 @@ use crate::data::enums::Player::{Player1, Player2};
 use crate::data::enums::{AppState, InsectType, Player};
 use crate::ui::{s_setup_ui, s_update_ui_for_round};
 use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
-use bevy::ecs::query::QueryEntityError;
 use bevy::math::vec3;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
@@ -29,7 +28,7 @@ fn main() {
         .add_plugins((DefaultPlugins, WorldCursorPlugin))
         .init_state::<AppState>()
         .add_systems(Startup, (setup_assets, setup.after(setup_assets)))
-        .add_systems(Startup, (s_setup_ui))
+        .add_systems(Startup, s_setup_ui)
         .add_systems(OnEnter(AppState::Init), s_init)
         .add_systems(Update, (s_build_cache, s_update_camera))
         .add_systems(OnEnter(AppState::Idle), s_spawn_tiles_from_inventory)
@@ -118,8 +117,8 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
     commands.spawn((PlayerInventory::new(), Player2));
 }
 fn s_update_camera(
-    mut res_position_cache: Res<PositionCache>,
-    mut res_time: Res<Time>,
+    res_position_cache: Res<PositionCache>,
+    res_time: Res<Time>,
     mut q_camera: Query<(&mut OrthographicProjection, &mut Transform)>,
 ) {
     let keys: Vec<_> = res_position_cache.0.keys().collect();

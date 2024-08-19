@@ -1,16 +1,7 @@
 use crate::data::components::{CurrentPlayer, GameAssets};
 use crate::data::enums::Player;
 use bevy::prelude::Commands;
-use bevy::{
-    a11y::{
-        accesskit::{NodeBuilder, Role},
-        AccessibilityNode,
-    },
-    color::palettes::basic::LIME,
-    input::mouse::{MouseScrollUnit, MouseWheel},
-    prelude::*,
-    winit::WinitSettings,
-};
+use bevy::prelude::*;
 
 #[derive(Component)]
 pub struct UIStatusText {}
