@@ -1,22 +1,22 @@
+use crate::data::enums::InsectType::{Ant, Queen};
+use crate::data::enums::{InsectType, Player};
+use crate::hex_coordinate::{HexCoordinate, ALL_DIRECTIONS};
+use crate::{Grasshopper, Spider};
+use bevy::asset::Handle;
 use bevy::prelude::{Bundle, ColorMaterial, Component, Entity, Image, Resource};
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use std::collections::HashMap;
-use bevy::asset::Handle;
-use crate::data::enums::{InsectType, Player};
-use crate::data::enums::InsectType::{Ant, Queen};
-use crate::hex_coordinate::{ALL_DIRECTIONS, HexCoordinate};
-use crate::{Grasshopper, Spider};
 
-#[derive(Resource,Copy,Clone)]
+#[derive(Resource, Copy, Clone)]
 pub struct CurrentPlayer {
-    pub(crate) player :Player,
+    pub(crate) player: Player,
 }
 
 #[derive(Resource)]
 pub struct GameAssets {
     pub(crate) color_materials: ColorMaterials,
     pub(crate) sprites: Sprites,
-    pub(crate) mesh:Mesh2dHandle,
+    pub(crate) mesh: Mesh2dHandle,
 }
 
 #[derive(Resource)]
@@ -37,38 +37,40 @@ impl Sprites {
     pub(crate) fn get(&self, insect: InsectType) -> Handle<Image> {
         match insect {
             InsectType::Ant => self.ant.clone(),
-            InsectType::Queen =>self.queen.clone(),
-            InsectType::Spider =>self.spider.clone(),
+            InsectType::Queen => self.queen.clone(),
+            InsectType::Spider => self.spider.clone(),
             InsectType::Grasshopper => self.grasshopper.clone(),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct PositionCacheEntry{
+pub struct PositionCacheEntry {
     pub(crate) player: Player,
     pub(crate) _insect_type: InsectType,
 }
 
-#[derive(Resource,Default)]
+#[derive(Resource, Default)]
 pub struct PositionCache(pub(crate) HashMap<HexCoordinate, PositionCacheEntry>);
 
 impl PositionCache {
-    pub fn get_without(&self, without: &HexCoordinate) ->PositionCache {
-
+    pub fn get_without(&self, without: &HexCoordinate) -> PositionCache {
         let mut new_has_map: HashMap<HexCoordinate, PositionCacheEntry> = HashMap::new();
 
         for coordinate in self.0.keys() {
-            if coordinate != without{
+            if coordinate != without {
                 new_has_map.insert(*coordinate, self.0.get(coordinate).unwrap().clone());
             }
         }
 
-
         PositionCache(new_has_map)
     }
 
-    pub(crate) fn get_surrounding_slidable_tiles(&self, new_position: HexCoordinate, ignore:&Vec<HexCoordinate>) -> Vec<HexCoordinate> {
+    pub(crate) fn get_surrounding_slidable_tiles(
+        &self,
+        new_position: HexCoordinate,
+        ignore: &Vec<HexCoordinate>,
+    ) -> Vec<HexCoordinate> {
         let mut valid_positions = vec![];
 
         for direction in ALL_DIRECTIONS {
@@ -77,7 +79,7 @@ impl PositionCache {
                 continue;
             }
 
-            if ignore.contains(&relative_position){
+            if ignore.contains(&relative_position) {
                 continue;
             }
 
@@ -105,19 +107,15 @@ pub struct SelectedTile(pub Entity);
 #[derive(Component)]
 pub struct MainCamera;
 
+#[derive(Component, Default)]
+pub struct PlacableTileState {}
 
 #[derive(Component, Default)]
-pub struct PlacableTileState {
-}
-
-#[derive(Component, Default)]
-pub struct PossiblePlacementTag {
-}
-
+pub struct PossiblePlacementTag {}
 
 #[derive(Component, Default)]
 pub struct IsInGame {
-    pub(crate) tile_on_top : Option<Entity>,
+    pub(crate) tile_on_top: Option<Entity>,
 }
 
 #[derive(Bundle)]
@@ -125,14 +123,14 @@ pub struct HiveTile {
     pub(crate) renderer: MaterialMesh2dBundle<ColorMaterial>,
     pub(crate) player: Player,
     pub(crate) placable_tile_tag: PlacableTileState,
-    pub(crate)  insect: InsectType
+    pub(crate) insect: InsectType,
 }
 
 #[derive(Bundle)]
 pub struct PossiblePlacementMarker {
     pub(crate) renderer: MaterialMesh2dBundle<ColorMaterial>,
     pub(crate) possible_placement_tag: PossiblePlacementTag,
-    pub(crate) hex_coordinate: HexCoordinate
+    pub(crate) hex_coordinate: HexCoordinate,
 }
 
 #[derive(Component, Clone)]
@@ -142,7 +140,19 @@ pub struct PlayerInventory {
 }
 
 impl PlayerInventory {
-    pub(crate) fn new()->PlayerInventory {
-        PlayerInventory { pieces: vec![Ant, Ant, Ant, Queen, Spider, Spider, Grasshopper, Grasshopper], moves_played: 0 }
+    pub(crate) fn new() -> PlayerInventory {
+        PlayerInventory {
+            pieces: vec![
+                Ant,
+                Ant,
+                Ant,
+                Queen,
+                Spider,
+                Spider,
+                Grasshopper,
+                Grasshopper,
+            ],
+            moves_played: 0,
+        }
     }
 }

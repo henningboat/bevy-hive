@@ -7,20 +7,20 @@ pub enum AppState {
     Idle,
     MovingTile,
     MoveFinished,
-    _PlayerWon
+    _PlayerWon,
 }
 
 #[derive(Component, Clone, Copy, PartialEq)]
-pub enum Player{
+pub enum Player {
     Player1,
-    Player2
+    Player2,
 }
 
-#[derive(Component,Default, Copy,Clone,PartialEq)]
+#[derive(Component, Default, Copy, Clone, PartialEq)]
 pub enum InsectType {
     #[default]
     Ant,
     Queen,
     Spider,
-    Grasshopper
+    Grasshopper,
 }
