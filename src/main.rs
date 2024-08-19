@@ -12,6 +12,7 @@ use crate::data::enums::{AppState, InsectType, Player};
 use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
 use bevy::math::vec3;
 use bevy::prelude::*;
+use bevy::render::camera::ScalingMode;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use hex_coordinate::HexCoordinate;
 
@@ -26,7 +27,7 @@ fn main() {
         .init_state::<AppState>()
         .add_systems(Startup, (setup_assets, setup.after(setup_assets)))
         .add_systems(OnEnter(AppState::Init), s_init)
-        .add_systems(Update, s_build_cache)
+        .add_systems(Update, (s_build_cache, s_update_camera))
         .add_systems(OnEnter(AppState::Idle), s_spawn_tiles_from_inventory)
         .add_systems(
             Update,
@@ -110,6 +111,40 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
 
     commands.spawn((PlayerInventory::new(), Player1));
     commands.spawn((PlayerInventory::new(), Player2));
+}
+fn s_update_camera(
+    mut res_position_cache: Res<PositionCache>,
+    mut res_time: Res<Time>,
+    mut q_camera: Query<(&mut OrthographicProjection, & mut Transform)>,
+) {
+    let keys: Vec<_> = res_position_cache.0.keys().collect();
+
+    let vectors: Vec<_> = keys.iter().map(|p| p.get_transform(0.).translation).collect();
+
+    let min = vectors.clone().into_iter().reduce(Vec3::min);
+    let max = vectors.into_iter().reduce(Vec3::max);
+
+    match (min, max) {
+        (Some(min), Some(max)) => {
+            let target_center = Vec3::lerp(min, max, 0.5);
+            for (mut projection, mut transform) in &mut q_camera {
+
+
+                let target_size = f32::max(500., max.y-min.y) + 300.;
+
+                match projection.scaling_mode {
+                    ScalingMode::FixedVertical(current_size) => {
+                        projection.scaling_mode = ScalingMode::FixedVertical(f32::lerp(current_size, target_size, res_time.delta_seconds()));
+                    }
+                    _ => { projection.scaling_mode = ScalingMode::FixedVertical(target_size); }
+                }
+
+                transform.translation= Vec3::lerp(transform.translation,target_center, res_time.delta_seconds());
+            }
+        }
+        (_, _) => {}
+    }
+
 }
 
 fn s_build_cache(
