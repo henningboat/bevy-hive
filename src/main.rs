@@ -115,11 +115,14 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
 fn s_update_camera(
     mut res_position_cache: Res<PositionCache>,
     mut res_time: Res<Time>,
-    mut q_camera: Query<(&mut OrthographicProjection, & mut Transform)>,
+    mut q_camera: Query<(&mut OrthographicProjection, &mut Transform)>,
 ) {
     let keys: Vec<_> = res_position_cache.0.keys().collect();
 
-    let vectors: Vec<_> = keys.iter().map(|p| p.get_transform(0.).translation).collect();
+    let vectors: Vec<_> = keys
+        .iter()
+        .map(|p| p.get_transform(0.).translation)
+        .collect();
 
     let min = vectors.clone().into_iter().reduce(Vec3::min);
     let max = vectors.into_iter().reduce(Vec3::max);
@@ -128,23 +131,30 @@ fn s_update_camera(
         (Some(min), Some(max)) => {
             let target_center = Vec3::lerp(min, max, 0.5);
             for (mut projection, mut transform) in &mut q_camera {
-
-
-                let target_size = f32::max(500., max.y-min.y) + 300.;
+                let target_size = f32::max(500., max.y - min.y) + 300.;
 
                 match projection.scaling_mode {
                     ScalingMode::FixedVertical(current_size) => {
-                        projection.scaling_mode = ScalingMode::FixedVertical(f32::lerp(current_size, target_size, res_time.delta_seconds()));
+                        projection.scaling_mode = ScalingMode::FixedVertical(f32::lerp(
+                            current_size,
+                            target_size,
+                            res_time.delta_seconds(),
+                        ));
                     }
-                    _ => { projection.scaling_mode = ScalingMode::FixedVertical(target_size); }
+                    _ => {
+                        projection.scaling_mode = ScalingMode::FixedVertical(target_size);
+                    }
                 }
 
-                transform.translation= Vec3::lerp(transform.translation,target_center, res_time.delta_seconds());
+                transform.translation = Vec3::lerp(
+                    transform.translation,
+                    target_center,
+                    res_time.delta_seconds(),
+                );
             }
         }
         (_, _) => {}
     }
-
 }
 
 fn s_build_cache(
