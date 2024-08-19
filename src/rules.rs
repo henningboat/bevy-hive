@@ -1,16 +1,13 @@
-use std::arch::aarch64::vaba_s8;
-use bevy::prelude::{Commands, default, Entity, Query, Res, Time, With};
+use bevy::prelude::{Commands, default, Query, Res, Time, With};
 use bevy::sprite::MaterialMesh2dBundle;
-use bevy::utils::hashbrown::Equivalent;
 use bevy::utils::HashSet;
 use crate::data::components::{CurrentPlayer, GameAssets, IsInGame, PositionCache, PossiblePlacementMarker, SelectedTile};
 use crate::data::enums::{InsectType, Player};
 use crate::hex_coordinate::{ALL_DIRECTIONS, HexCoordinate};
-use crate::rules;
 
 pub fn s_spawn_placement_markers(
     time:Res<Time>,
-    mut position_cache: Res<PositionCache>,
+    position_cache: Res<PositionCache>,
     q_player:Query<&Player, With<IsInGame>>,
     q_insect:Query<&InsectType>,
     q_hex_coord:Query<&HexCoordinate, With<IsInGame>>,
@@ -167,7 +164,7 @@ fn get_moves_for_new_piece(position_cache: Res<PositionCache>, current_player: P
 
             already_checked.insert(position_to_check);
 
-            if (position_cache.0.contains_key(&position_to_check)) {
+            if position_cache.0.contains_key(&position_to_check) {
                 continue;
             }
 
@@ -204,7 +201,7 @@ fn check_moving_piece_allowed(position_cache: &PositionCache) -> bool {
     let mut connected_tiles = vec![];
 
     let all_positions: Vec<_> = position_cache.0.keys().collect();
-    if (all_positions.len() > 0) {
+    if all_positions.len() > 0 {
         open_list.push(all_positions[0].clone());
 
         loop {

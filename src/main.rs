@@ -1,14 +1,9 @@
 //! Renders an animated sprite by loading all animation frames from a single image (a sprite sheet)
 //! into a texture atlas, and changing the displayed image periodically.
 
-use std::ops::Index;
-use bevy::ecs::query::QueryEntityError;
 use bevy::math::vec3;
 use bevy::prelude::*;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
-use bevy::utils::hashbrown::Equivalent;
-use bevy::utils::HashSet;
-use data::*;
 use hex_coordinate::HexCoordinate;
 use crate::data::components::{ColorMaterials, CountDown, CurrentPlayer, GameAssets, IsInGame, MainCamera, HiveTile, PlacableTileState, PlayerInventory, PositionCache, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites, PositionCacheEntry};
 use crate::data::enums::{AppState, InsectType, Player};
@@ -47,7 +42,7 @@ fn setup_assets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    mut asset_server: Res<AssetServer>
+    asset_server: Res<AssetServer>
 ) {
     let red_material = materials.add(Color::LinearRgba(LinearRgba::new(1.0, 0.0, 0.0, 1.0).into()));
     let white_material = materials.add(Color::LinearRgba(LinearRgba::new(1.0, 1.0, 1.0, 1.0).into()));
@@ -97,7 +92,7 @@ fn setup(
 
 fn s_build_cache(
     mut position_cache: ResMut<PositionCache>,
-    mut TileQueue: Query<(Entity,&HexCoordinate,&IsInGame, &Player, &InsectType)>,
+    TileQueue: Query<(Entity,&HexCoordinate,&IsInGame, &Player, &InsectType)>,
 ) {
     position_cache.0.clear();
 
@@ -113,8 +108,8 @@ fn s_build_cache(
 }
 
 fn s_cleanup_tile_placement(
-    q_possible_placements : Query<(Entity),(With<PossiblePlacementTag>)>,
-    q_placable_tiles : Query<(Entity),(With<PlacableTileState>)>,
+    q_possible_placements : Query<Entity,With<PossiblePlacementTag>>,
+    q_placable_tiles : Query<Entity,With<PlacableTileState>>,
     mut q_transforms_with_hex_coord:Query<(&mut Transform, &HexCoordinate)>,
     mut commands: Commands,
 ) {
@@ -162,7 +157,7 @@ fn s_spawn_tiles_from_inventory(
     let mut offset = 0.0;
 
     //the queen needs to be played within the first 3 moves
-    let pieces_to_spawn = match (inventory.moves_played==2 && inventory.pieces.contains(&Queen)) {
+    let pieces_to_spawn = match inventory.moves_played==2 && inventory.pieces.contains(&Queen) {
         true => {vec![Queen]}
         false => {inventory.pieces.clone()}
     };
@@ -201,16 +196,16 @@ fn s_spawn_tiles_from_inventory(
 
 fn s_update_idle(
     world_cursor: Res<WorldCursor>,
-    mut q_placable_tiles:  Query<(Entity, &mut Transform, &mut Player), (Without<PossiblePlacementTag>)>,
+    mut q_placable_tiles:  Query<(Entity, &mut Transform, &mut Player), Without<PossiblePlacementTag>>,
     mut commands: Commands,
     game_assets: Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut timer:ResMut<CountDown>
+    timer:ResMut<CountDown>
 ){
     match world_cursor.press_state {
         PressState::JustPressed => {
-            for (entity, transform, mut player) in &mut q_placable_tiles {
+            for (entity, transform, player) in &mut q_placable_tiles {
 
                 if *player != current_player.player{
                     continue;
@@ -236,16 +231,16 @@ fn s_update_idle(
 fn s_move_tile(
     world_cursor: Res<WorldCursor>,
    // mut q_transform:  Query<(&mut Transform)>,
-    mut q_possible_placements:  Query<(&mut Transform), Without<PossiblePlacementTag>>,
+    mut q_possible_placements:  Query<&mut Transform, Without<PossiblePlacementTag>>,
     mut m_placement_markers:  Query<(&Transform, &HexCoordinate, &PossiblePlacementTag)>,
-    mut q_placable_tile_state : Query<&PlacableTileState>,
+    q_placable_tile_state : Query<&PlacableTileState>,
     mut q_inventory : Query<(& mut PlayerInventory, &Player)>,
-    mut q_insect : Query<(& InsectType)>,
+    q_insect : Query<& InsectType>,
     mut commands: Commands,
     selected_tile: Res<SelectedTile>,
     game_assets: Res<GameAssets>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut timer:ResMut<CountDown>,
+    timer:ResMut<CountDown>,
     current_player: Res<CurrentPlayer>
 ) {
     let selected_entity = selected_tile.0;
@@ -265,14 +260,14 @@ fn s_move_tile(
         // PressState::JustPressed => {}
         PressState::Pressed =>
             {
-                if let Ok((mut transform)) = q_possible_placements.get_mut(selected_entity) {
+                if let Ok(mut transform) = q_possible_placements.get_mut(selected_entity) {
                     transform.translation = Vec3::new(world_cursor.position.x, world_cursor.position.y, 0.);
                 }
             }
 
         //PressState::JustReleased => {}
         _ => {
-            if let Ok((mut selected_transform)) = q_possible_placements.get_mut(selected_entity) {
+            if let Ok(selected_transform) = q_possible_placements.get_mut(selected_entity) {
                 for (possible_placement, hex_coordinate, _) in &mut m_placement_markers {
                     if possible_placement.translation.distance(selected_transform.translation) < 50. {
 

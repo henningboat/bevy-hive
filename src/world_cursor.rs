@@ -1,7 +1,7 @@
-use bevy::app::{App, Plugin, Startup, Update};
+use bevy::app::{App, Plugin, Update};
 use bevy::input::ButtonInput;
 use bevy::math::Vec2;
-use bevy::prelude::{Camera, Camera2dBundle, Commands, Component, GlobalTransform, MouseButton, Query, Res, ResMut, Resource, Window, With};
+use bevy::prelude::{Camera, GlobalTransform, MouseButton, Query, Res, ResMut, Resource, Window, With};
 use bevy::window::PrimaryWindow;
 use crate::data::components::MainCamera;
 use crate::world_cursor::PressState::*;

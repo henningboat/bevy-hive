@@ -1,5 +1,5 @@
-use bevy::prelude::{Bundle, ColorMaterial, Component, default, Entity, Has, Image, Resource, States};
-use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle, Sprite};
+use bevy::prelude::{Bundle, ColorMaterial, Component, Entity, Image, Resource};
+use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use std::collections::HashMap;
 use bevy::asset::Handle;
 use crate::data::enums::{InsectType, Player};
