@@ -47,7 +47,7 @@ impl Sprites {
 #[derive(Clone)]
 pub struct PositionCacheEntry{
     pub(crate) player: Player,
-    pub(crate) insect_type: InsectType,
+    pub(crate) _insect_type: InsectType,
 }
 
 #[derive(Resource,Default)]
@@ -71,8 +71,8 @@ impl PositionCache {
     pub(crate) fn get_surrounding_slidable_tiles(&self, new_position: HexCoordinate, ignore:&Vec<HexCoordinate>) -> Vec<HexCoordinate> {
         let mut valid_positions = vec![];
 
-        for DIRECTION in ALL_DIRECTIONS {
-            let relative_position = new_position.get_relative(DIRECTION);
+        for direction in ALL_DIRECTIONS {
+            let relative_position = new_position.get_relative(direction);
             if self.0.contains_key(&relative_position) {
                 continue;
             }
@@ -81,7 +81,7 @@ impl PositionCache {
                 continue;
             }
 
-            let sides = DIRECTION.get_adjacent_directions();
+            let sides = direction.get_adjacent_directions();
 
             let mut filled_space_count = 0;
             for side in sides {
@@ -98,9 +98,6 @@ impl PositionCache {
     }
 }
 
-#[derive(Resource,Default)]
-pub struct CountDown(pub(crate) f32);
-
 #[derive(Resource)]
 pub struct SelectedTile(pub Entity);
 
@@ -111,12 +108,10 @@ pub struct MainCamera;
 
 #[derive(Component, Default)]
 pub struct PlacableTileState {
-    pub(crate) selected:bool,
 }
 
 #[derive(Component, Default)]
 pub struct PossiblePlacementTag {
-    selected:bool,
 }
 
 

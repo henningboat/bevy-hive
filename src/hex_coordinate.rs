@@ -1,6 +1,5 @@
 use bevy::prelude::{Component, Transform};
 use bevy::math::Vec3;
-use crate::data::enums::InsectType;
 
 #[derive(Component, Default, Copy, Clone, Hash, Debug)]
 #[derive(Eq, PartialEq)]
@@ -10,7 +9,7 @@ pub struct HexCoordinate{
 }
 
 impl HexCoordinate {
-    pub(crate) fn Origin() -> HexCoordinate {
+    pub(crate) fn origin() -> HexCoordinate {
         HexCoordinate { x: 0, y: 0 }
     }
 
@@ -34,8 +33,6 @@ impl HexCoordinate {
 
 }
 pub const ALL_DIRECTIONS: [&'static HexDirection; 6] = [&HexDirection::UpRight,&HexDirection::Right,&HexDirection::DownRight, &HexDirection::DownLeft,&HexDirection::Left,&HexDirection::UpLeft,];
-pub const ALL_INSECTS: [&'static InsectType; 2] = [&InsectType::Ant,&InsectType::Queen];
-
 
 #[derive(Debug, PartialEq)]
 pub enum HexDirection {

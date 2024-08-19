@@ -5,7 +5,7 @@ use bevy::math::vec3;
 use bevy::prelude::*;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use hex_coordinate::HexCoordinate;
-use crate::data::components::{ColorMaterials, CountDown, CurrentPlayer, GameAssets, IsInGame, MainCamera, HiveTile, PlacableTileState, PlayerInventory, PositionCache, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites, PositionCacheEntry};
+use crate::data::components::{ColorMaterials, CurrentPlayer, GameAssets, IsInGame, MainCamera, HiveTile, PlacableTileState, PlayerInventory, PositionCache, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites, PositionCacheEntry};
 use crate::data::enums::{AppState, InsectType, Player};
 pub use crate::data::enums::InsectType::*;
 use crate::data::enums::Player::{Player1, Player2};
@@ -29,7 +29,6 @@ fn main() {
          .add_systems(OnExit(AppState::MovingTile), s_cleanup_tile_placement)
         .add_systems(OnEnter(AppState::MoveFinished), s_enter_move_finished)
         .insert_resource(PositionCache::default())
-        .insert_resource(CountDown(2.))
         .insert_resource(CurrentPlayer { player: Player1 })
         .run();
 }
@@ -71,7 +70,7 @@ fn setup(
 ) {
     commands.spawn((Camera2dBundle::default(), MainCamera));
 
-    let origin = HexCoordinate::Origin();
+    let origin = HexCoordinate::origin();
     let bundle = PossiblePlacementMarker {
         renderer: MaterialMesh2dBundle {
             mesh: game_assets.mesh.clone(),
@@ -92,18 +91,18 @@ fn setup(
 
 fn s_build_cache(
     mut position_cache: ResMut<PositionCache>,
-    TileQueue: Query<(Entity,&HexCoordinate,&IsInGame, &Player, &InsectType)>,
+    tile_queue: Query<(&HexCoordinate,&IsInGame, &Player, &InsectType)>,
 ) {
     position_cache.0.clear();
 
-    for (entity, hex, hive_tile, player, insect_type) in TileQueue.iter() {
+        for (hex, hive_tile, player, insect_type) in tile_queue.iter() {
         if let Some(_)= hive_tile.tile_on_top{
             continue;
         }
         if position_cache.0.contains_key(hex){
             panic!();
         }
-        position_cache.0.insert(*hex, PositionCacheEntry{player:player.clone(), insect_type:insect_type.clone()});
+        position_cache.0.insert(*hex, PositionCacheEntry{player:player.clone(), _insect_type:insect_type.clone()});
     }
 }
 
@@ -138,7 +137,6 @@ fn s_enter_move_finished(
 
 
 fn s_spawn_tiles_from_inventory(
-    time:Res<Time>,
     q_inventory:Query<(&PlayerInventory,&Player)>,
     game_assets : Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
@@ -177,7 +175,7 @@ fn s_spawn_tiles_from_inventory(
                 ..default()
             },
             player:current_player.clone(),
-            placable_tile_tag: PlacableTileState {selected: false },
+            placable_tile_tag: PlacableTileState {},
             insect
         };
 
@@ -198,10 +196,8 @@ fn s_update_idle(
     world_cursor: Res<WorldCursor>,
     mut q_placable_tiles:  Query<(Entity, &mut Transform, &mut Player), Without<PossiblePlacementTag>>,
     mut commands: Commands,
-    game_assets: Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
     mut next_state: ResMut<NextState<AppState>>,
-    timer:ResMut<CountDown>
 ){
     match world_cursor.press_state {
         PressState::JustPressed => {
@@ -238,9 +234,7 @@ fn s_move_tile(
     q_insect : Query<& InsectType>,
     mut commands: Commands,
     selected_tile: Res<SelectedTile>,
-    game_assets: Res<GameAssets>,
     mut next_state: ResMut<NextState<AppState>>,
-    timer:ResMut<CountDown>,
     current_player: Res<CurrentPlayer>
 ) {
     let selected_entity = selected_tile.0;
@@ -274,15 +268,12 @@ fn s_move_tile(
                         // commands.spawn(HiveTile::new(*hex_coordinate, &game_assets, current_player.player));
 
                         match q_placable_tile_state.get(selected_entity) {
-                            Ok(state) => {
-                                let current_player = &current_player.clone();
+                            Ok(_) => {
                                 let mut new_pieces = inventory.pieces.clone();
 
                                 new_pieces.remove(new_pieces.iter().position(|i|i==q_insect.get(selected_entity).unwrap()).unwrap());
 
                                 inventory.pieces= new_pieces;
-
-
 
                                 commands.entity(selected_entity).insert(IsInGame { tile_on_top: None }).insert(hex_coordinate.clone()).remove::<PlacableTileState>();
                             }

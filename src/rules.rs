@@ -1,4 +1,4 @@
-use bevy::prelude::{Commands, default, Query, Res, Time, With};
+use bevy::prelude::{Commands, default, Query, Res, With};
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashSet;
 use crate::data::components::{CurrentPlayer, GameAssets, IsInGame, PositionCache, PossiblePlacementMarker, SelectedTile};
@@ -6,7 +6,6 @@ use crate::data::enums::{InsectType, Player};
 use crate::hex_coordinate::{ALL_DIRECTIONS, HexCoordinate};
 
 pub fn s_spawn_placement_markers(
-    time:Res<Time>,
     position_cache: Res<PositionCache>,
     q_player:Query<&Player, With<IsInGame>>,
     q_insect:Query<&InsectType>,
@@ -19,7 +18,7 @@ pub fn s_spawn_placement_markers(
 ) {
     let is_new_piece = !q_is_hive_tile.contains(selected_tile.0);
 
-    let mut valid_moves = vec![];
+    let valid_moves;
     if is_new_piece{
 
         let player_has_tile_in_game = q_player.iter().any(|p|*p == current_player.player);
@@ -68,11 +67,11 @@ fn get_moves_for_queen(position_cache: PositionCache, current_position: HexCoord
 fn get_moves_for_grasshopper(position_cache: PositionCache, start_position: HexCoordinate) -> Vec<HexCoordinate> {
     let mut possible_moves= vec![];
     
-    for DIRECTION in ALL_DIRECTIONS {
+    for direction in ALL_DIRECTIONS {
         let mut position = start_position;
         let mut at_lest_one_jump=false;
         loop {
-            let new_position = position.get_relative(DIRECTION);
+            let new_position = position.get_relative(direction);
         
             if !position_cache.0.contains_key(&new_position){
 
@@ -156,7 +155,7 @@ fn get_moves_for_new_piece(position_cache: Res<PositionCache>, current_player: P
 
     //  spawn placement markers
     let mut already_checked = HashSet::new();
-    for (position, entry) in &position_cache.0 {
+    for (position, _) in &position_cache.0 {
         for position_to_check in ALL_DIRECTIONS.map(|x| position.get_relative(x)) {
             if already_checked.contains(&position_to_check) {
                 continue;
@@ -223,8 +222,8 @@ fn check_moving_piece_allowed(position_cache: &PositionCache) -> bool {
 
             connected_tiles.push(position);
 
-            for DIRECTION in ALL_DIRECTIONS {
-                let relative = position.get_relative(DIRECTION);
+            for direction in ALL_DIRECTIONS {
+                let relative = position.get_relative(direction);
                 if checked_tiles.contains(&relative) {
                     continue;
                 }
