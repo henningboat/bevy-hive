@@ -3,6 +3,7 @@ use crate::data::enums::{InsectType, Player};
 use crate::hex_coordinate::{HexCoordinate, ALL_DIRECTIONS};
 use crate::{Grasshopper, Spider};
 use bevy::asset::Handle;
+use bevy::color::{Color, LinearRgba};
 use bevy::prelude::{Bundle, ColorMaterial, Component, Entity, Image, Resource};
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use std::collections::HashMap;
@@ -17,6 +18,15 @@ pub struct GameAssets {
     pub(crate) color_materials: ColorMaterials,
     pub(crate) sprites: Sprites,
     pub(crate) mesh: Mesh2dHandle,
+}
+
+impl GameAssets {
+    pub fn get_color_for_player(&self, player: Player) -> Color {
+        match player {
+            Player::Player1 => Color::LinearRgba(LinearRgba::new(1.0, 1.0, 1.0, 1.0).into()),
+            Player::Player2 => Color::LinearRgba(LinearRgba::new(1.0, 0.0, 0.0, 1.0).into()),
+        }
+    }
 }
 
 #[derive(Resource)]
@@ -146,9 +156,12 @@ impl PlayerInventory {
                 Ant,
                 Ant,
                 Ant,
+                Ant,
                 Queen,
                 Spider,
                 Spider,
+                Spider,
+                Grasshopper,
                 Grasshopper,
                 Grasshopper,
             ],

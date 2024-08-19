@@ -9,7 +9,9 @@ use crate::data::components::{
 pub use crate::data::enums::InsectType::*;
 use crate::data::enums::Player::{Player1, Player2};
 use crate::data::enums::{AppState, InsectType, Player};
+use crate::ui::{s_setup_ui, s_update_ui_for_round};
 use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
+use bevy::ecs::query::QueryEntityError;
 use bevy::math::vec3;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
@@ -19,6 +21,7 @@ use hex_coordinate::HexCoordinate;
 mod data;
 mod hex_coordinate;
 mod rules;
+mod ui;
 mod world_cursor;
 
 fn main() {
@@ -26,9 +29,11 @@ fn main() {
         .add_plugins((DefaultPlugins, WorldCursorPlugin))
         .init_state::<AppState>()
         .add_systems(Startup, (setup_assets, setup.after(setup_assets)))
+        .add_systems(Startup, (s_setup_ui))
         .add_systems(OnEnter(AppState::Init), s_init)
         .add_systems(Update, (s_build_cache, s_update_camera))
         .add_systems(OnEnter(AppState::Idle), s_spawn_tiles_from_inventory)
+        .add_systems(OnEnter(AppState::Idle), s_update_ui_for_round)
         .add_systems(
             Update,
             s_update_idle
@@ -94,7 +99,7 @@ fn setup_assets(
 }
 
 fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
-    commands.spawn((Camera2dBundle::default(), MainCamera));
+    commands.spawn((Camera2dBundle::default(), MainCamera, IsDefaultUiCamera));
 
     let origin = HexCoordinate::origin();
     let bundle = PossiblePlacementMarker {
@@ -183,15 +188,18 @@ fn s_build_cache(
 fn s_cleanup_tile_placement(
     q_possible_placements: Query<Entity, With<PossiblePlacementTag>>,
     q_placable_tiles: Query<Entity, With<PlacableTileState>>,
+    q_in_game_tiles: Query<&IsInGame>,
     mut q_transforms_with_hex_coord: Query<(&mut Transform, &HexCoordinate)>,
     mut commands: Commands,
 ) {
+    if !q_in_game_tiles.is_empty() {
     for entity in &q_possible_placements {
         commands.entity(entity).despawn_recursive();
-    }
-    for entity in &q_placable_tiles {
-        commands.entity(entity).despawn_recursive();
-    }
+    }}
+        for entity in &q_placable_tiles {
+            commands.entity(entity).despawn_recursive();
+        }
+
 
     for (mut transform, hex) in &mut q_transforms_with_hex_coord {
         *transform = hex.get_transform(0.);
@@ -225,7 +233,7 @@ fn s_spawn_tiles_from_inventory(
 
     let inventory = inventory.unwrap();
 
-    let mut offset = 0.0;
+    let mut offset = -400.0;
 
     //the queen needs to be played within the first 3 moves
     let pieces_to_spawn = match inventory.moves_played == 2 && inventory.pieces.contains(&Queen) {
@@ -274,9 +282,11 @@ fn s_update_idle(
     world_cursor: Res<WorldCursor>,
     mut q_placable_tiles: Query<
         (Entity, &mut Transform, &mut Player),
-        Without<PossiblePlacementTag>,
+        (Without<PossiblePlacementTag>, Without<Camera2d>),
     >,
     mut commands: Commands,
+    q_camera: Query<(&OrthographicProjection, &Transform), With<Camera2d>>,
+    q_is_in_game: Query<&IsInGame>,
     current_player: Res<CurrentPlayer>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
@@ -297,6 +307,23 @@ fn s_update_idle(
 
                     next_state.set(AppState::MovingTile);
                     break;
+                }
+            }
+        }
+        PressState::Released => {
+            let (orthographic_projection, camera_transform) = q_camera.single();
+            let vertical_half_size =
+                orthographic_projection.scale * orthographic_projection.area.height() / 2.0;
+
+            // The Y position of the lower border
+            let lower_border_y = camera_transform.translation.y - vertical_half_size;
+
+            for (entity, mut transform, _) in &mut q_placable_tiles {
+                match &q_is_in_game.get(entity) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        transform.translation.y = lower_border_y + 60.;
+                    }
                 }
             }
         }
