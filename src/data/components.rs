@@ -1,5 +1,5 @@
 use crate::data::enums::InsectType::{Ant, Queen};
-use crate::data::enums::{InsectType, Player};
+use crate::data::enums::{GameResult, InsectType, Player};
 use crate::hex_coordinate::{HexCoordinate, ALL_DIRECTIONS};
 use crate::{Grasshopper, Spider};
 use bevy::asset::Handle;
@@ -35,6 +35,12 @@ pub struct ColorMaterials {
     pub(crate) white: Handle<ColorMaterial>,
     pub(crate) grey: Handle<ColorMaterial>,
 }
+
+#[derive(Resource)]
+pub struct GameResultResource {
+    pub result: Option<GameResult>,
+}
+
 #[derive(Resource)]
 pub struct Sprites {
     pub(crate) ant: Handle<Image>,

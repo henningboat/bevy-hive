@@ -2,20 +2,23 @@
 //! into a texture atlas, and changing the displayed image periodically.
 
 use crate::data::components::{
-    ColorMaterials, CurrentPlayer, GameAssets, HiveTile, IsInGame, MainCamera, PlacableTileState,
-    PlayerInventory, PositionCache, PositionCacheEntry, PossiblePlacementMarker,
+    ColorMaterials, CurrentPlayer, GameAssets, GameResultResource, HiveTile, IsInGame, MainCamera,
+    PlacableTileState, PlayerInventory, PositionCache, PositionCacheEntry, PossiblePlacementMarker,
     PossiblePlacementTag, SelectedTile, Sprites,
 };
 pub use crate::data::enums::InsectType::*;
 use crate::data::enums::Player::{Player1, Player2};
-use crate::data::enums::{AppState, InsectType, Player};
+use crate::data::enums::{AppState, GameResult, InsectType, Player};
+use crate::hex_coordinate::ALL_DIRECTIONS;
 use crate::ui::{s_setup_ui, s_update_ui_for_round};
 use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
 use bevy::math::vec3;
 use bevy::prelude::*;
+use bevy::reflect::List;
 use bevy::render::camera::ScalingMode;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use hex_coordinate::HexCoordinate;
+use std::process::Command;
 
 mod data;
 mod hex_coordinate;
@@ -32,7 +35,7 @@ fn main() {
         .add_systems(OnEnter(AppState::Init), s_init)
         .add_systems(Update, (s_build_cache, s_update_camera))
         .add_systems(OnEnter(AppState::Idle), s_spawn_tiles_from_inventory)
-        .add_systems(OnEnter(AppState::Idle), s_update_ui_for_round)
+        .add_systems(Update, s_update_ui_for_round)
         .add_systems(
             Update,
             s_update_idle
@@ -50,9 +53,13 @@ fn main() {
                 .run_if(in_state(AppState::MovingTile)),
         )
         .add_systems(OnExit(AppState::MovingTile), s_cleanup_tile_placement)
-        .add_systems(OnEnter(AppState::MoveFinished), s_enter_move_finished)
+        .add_systems(
+            OnEnter(AppState::MoveFinished),
+            (s_build_cache, s_enter_move_finished.after(s_build_cache)),
+        )
         .insert_resource(PositionCache::default())
         .insert_resource(CurrentPlayer { player: Player1 })
+        .insert_resource(GameResultResource{result:None})
         .run();
 }
 
@@ -192,13 +199,13 @@ fn s_cleanup_tile_placement(
     mut commands: Commands,
 ) {
     if !q_in_game_tiles.is_empty() {
-    for entity in &q_possible_placements {
-        commands.entity(entity).despawn_recursive();
-    }}
-        for entity in &q_placable_tiles {
+        for entity in &q_possible_placements {
             commands.entity(entity).despawn_recursive();
         }
-
+    }
+    for entity in &q_placable_tiles {
+        commands.entity(entity).despawn_recursive();
+    }
 
     for (mut transform, hex) in &mut q_transforms_with_hex_coord {
         *transform = hex.get_transform(0.);
@@ -208,12 +215,56 @@ fn s_cleanup_tile_placement(
 fn s_enter_move_finished(
     mut next_state: ResMut<NextState<AppState>>,
     mut current_player: ResMut<CurrentPlayer>,
+    q_bee: Query<(&InsectType, &Player, &HexCoordinate)>,
+    position_cache: Res<PositionCache>,
+    mut commands: Commands,
 ) {
-    match current_player.player {
-        Player1 => current_player.player = Player2,
-        Player2 => current_player.player = Player1,
+    let mut players_that_lost = vec![];
+
+    for (insect_type, queen_player, hex) in &q_bee {
+        if insect_type != &Queen {
+            continue;
+        }
+
+        if queen_player == &current_player.player {
+            continue;
+        }
+
+        let surrounded = ALL_DIRECTIONS
+            .iter()
+            .map(|direction| hex.get_relative(direction))
+            .all(|relative_position| position_cache.0.contains_key(&relative_position));
+
+        if surrounded {
+            players_that_lost.push(queen_player);
+        }
     }
-    next_state.set(AppState::Idle);
+
+    match players_that_lost.len() {
+        0 => {
+            match current_player.player {
+                Player1 => current_player.player = Player2,
+                Player2 => current_player.player = Player1,
+            }
+            next_state.set(AppState::Idle);
+        }
+        1 => {
+            let player_that_won = match players_that_lost[0] {
+                Player1 => Player2,
+                Player2 => Player1,
+            };
+            commands.insert_resource(GameResultResource {
+                result: Some(GameResult::PlayerWon(player_that_won)),
+            });
+            next_state.set(AppState::PlayerWon);
+        }
+        _ => {
+            commands.insert_resource(GameResultResource {
+                result: Some(GameResult::Draw),
+            });
+            next_state.set(AppState::PlayerWon);
+        }
+    }
 }
 
 fn s_spawn_tiles_from_inventory(
