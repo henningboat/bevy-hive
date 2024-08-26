@@ -1,7 +1,7 @@
 use crate::data::enums::InsectType::{Ant, Queen};
 use crate::data::enums::{GameResult, InsectType, Player};
 use crate::hex_coordinate::{HexCoordinate, ALL_DIRECTIONS};
-use crate::{Grasshopper, Spider};
+use crate::{Beetle, Grasshopper, Spider};
 use bevy::asset::Handle;
 use bevy::color::{Color, LinearRgba};
 use bevy::prelude::{Bundle, ColorMaterial, Component, Entity, Image, Resource};
@@ -46,6 +46,7 @@ pub struct Sprites {
     pub(crate) ant: Handle<Image>,
     pub(crate) queen: Handle<Image>,
     pub(crate) spider: Handle<Image>,
+    pub(crate) beetle: Handle<Image>,
     pub(crate) grasshopper: Handle<Image>,
 }
 
@@ -56,6 +57,7 @@ impl Sprites {
             InsectType::Queen => self.queen.clone(),
             InsectType::Spider => self.spider.clone(),
             InsectType::Grasshopper => self.grasshopper.clone(),
+            InsectType::Beetle => self.beetle.clone(),
         }
     }
 }
@@ -134,6 +136,11 @@ pub struct IsInGame {
     pub(crate) tile_on_top: Option<Entity>,
 }
 
+#[derive(Component)]
+pub struct IsOnTopOf {
+    pub tile_on_top: Entity,
+}
+
 #[derive(Bundle)]
 pub struct HiveTile {
     pub(crate) renderer: MaterialMesh2dBundle<ColorMaterial>,
@@ -167,6 +174,8 @@ impl PlayerInventory {
                 Spider,
                 Spider,
                 Spider,
+                Beetle,
+                Beetle,
                 Grasshopper,
                 Grasshopper,
                 Grasshopper,

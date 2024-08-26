@@ -23,6 +23,7 @@ pub enum InsectType {
     Queen,
     Spider,
     Grasshopper,
+    Beetle
 }
 
 pub enum GameResult {

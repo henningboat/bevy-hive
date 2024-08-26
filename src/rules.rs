@@ -1,9 +1,9 @@
-use crate::data::components::{
-    CurrentPlayer, GameAssets, IsInGame, PositionCache, PossiblePlacementMarker, SelectedTile,
-};
+use bevy::ecs::query::QueryEntityError;
+use bevy::math::Vec3;
+use crate::data::components::{CurrentPlayer, GameAssets, IsInGame, IsOnTopOf, PositionCache, PossiblePlacementMarker, SelectedTile};
 use crate::data::enums::{InsectType, Player};
 use crate::hex_coordinate::{HexCoordinate, ALL_DIRECTIONS};
-use bevy::prelude::{default, Commands, Query, Res, With};
+use bevy::prelude::{default, Commands, Query, Res, With, Entity};
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashSet;
 
@@ -13,6 +13,7 @@ pub fn s_spawn_placement_markers(
     q_insect: Query<&InsectType>,
     q_hex_coord: Query<&HexCoordinate, With<IsInGame>>,
     q_is_hive_tile: Query<(), With<IsInGame>>,
+    q_is_on_top_of:  Query<(), (With<IsOnTopOf>,With<IsInGame>)>,
     game_assets: Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
     selected_tile: Res<SelectedTile>,
@@ -53,6 +54,9 @@ pub fn s_spawn_placement_markers(
             InsectType::Grasshopper => {
                 get_moves_for_grasshopper(position_cache_without_selected, selected_tile_position)
             }
+            InsectType::Beetle => {
+                get_moves_for_beetle(position_cache_without_selected, selected_tile_position,q_is_on_top_of,selected_tile.0)
+            }
         }
     }
 
@@ -61,7 +65,7 @@ pub fn s_spawn_placement_markers(
             renderer: MaterialMesh2dBundle {
                 mesh: game_assets.mesh.clone(),
                 material: game_assets.color_materials.grey.clone(),
-                transform: valid_move.get_transform(-2.),
+                transform: valid_move.get_transform(-2.).with_scale(Vec3::new(1.2,1.2,1.2)),
                 ..default()
             },
             possible_placement_tag: Default::default(),
@@ -76,6 +80,30 @@ fn get_moves_for_queen(
     current_position: HexCoordinate,
 ) -> Vec<HexCoordinate> {
     position_cache.get_surrounding_slidable_tiles(current_position, &vec![])
+}
+
+fn get_moves_for_beetle(
+    position_cache: PositionCache,
+    current_position: HexCoordinate,
+    q_is_on_top_of: Query<(), (With<IsOnTopOf>,With<IsInGame>)>,
+    entity: Entity,
+) -> Vec<HexCoordinate> {
+
+    let mut can_move_to_empty= match q_is_on_top_of.get(entity) {
+        Ok(_) => {true}
+        Err(_) => {false}
+    };
+
+    let mut result = vec![];
+
+    for potential_move in ALL_DIRECTIONS.map(|dir| current_position.get_relative(dir)) {
+        if !can_move_to_empty && !position_cache.0.contains_key(&potential_move) {
+            continue;
+        }
+        result.push(potential_move);
+    }
+
+    result
 }
 
 fn get_moves_for_grasshopper(

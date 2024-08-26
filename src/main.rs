@@ -95,6 +95,7 @@ fn setup_assets(
         queen: asset_server.load("bee.png"),
         spider: asset_server.load("spider.png"),
         grasshopper: asset_server.load("grasshopper.png"),
+        beetle: asset_server.load("beetle.png"),
     };
 
     commands.insert_resource(GameAssets {
@@ -389,6 +390,7 @@ fn s_move_tile(
     mut m_placement_markers: Query<(&Transform, &HexCoordinate, &PossiblePlacementTag)>,
     q_placable_tile_state: Query<&PlacableTileState>,
     mut q_inventory: Query<(&mut PlayerInventory, &Player)>,
+    mut q_is_in_game: Query<(&mut IsInGame,)>,
     q_insect: Query<&InsectType>,
     mut commands: Commands,
     selected_tile: Res<SelectedTile>,
@@ -420,7 +422,7 @@ fn s_move_tile(
         //PressState::JustReleased => {}
         _ => {
             if let Ok(selected_transform) = q_possible_placements.get_mut(selected_entity) {
-                for (possible_placement, hex_coordinate, _) in &mut m_placement_markers {
+                for (possible_placement, possible_hex_coordinate, _) in &mut m_placement_markers {
                     if possible_placement
                         .translation
                         .distance(selected_transform.translation)
@@ -441,21 +443,25 @@ fn s_move_tile(
 
                                 inventory.pieces = new_pieces;
 
+
+
                                 commands
                                     .entity(selected_entity)
                                     .insert(IsInGame { tile_on_top: None })
-                                    .insert(hex_coordinate.clone())
+                                    .insert(possible_hex_coordinate.clone())
                                     .remove::<PlacableTileState>();
                             }
                             Err(_) => {
                                 commands
                                     .entity(selected_entity)
-                                    .insert(hex_coordinate.clone());
+                                    .insert(possible_hex_coordinate.clone());
                             }
                         }
 
                         inventory.moves_played += 1;
                         next_state.set(AppState::MoveFinished);
+
+
 
                         return;
                     }
