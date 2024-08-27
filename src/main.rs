@@ -1,17 +1,15 @@
 //! Renders an animated sprite by loading all animation frames from a single image (a sprite sheet)
 //! into a texture atlas, and changing the displayed image periodically.
 
-use crate::data::components::{
-    ColorMaterials, CurrentPlayer, GameAssets, GameResultResource, HiveTile, IsInGame, MainCamera,
-    PlacableTileState, PlayerInventory, PositionCache, PositionCacheEntry, PossiblePlacementMarker,
-    PossiblePlacementTag, SelectedTile, Sprites,
-};
+use std::ops::Deref;
+use crate::data::components::{ColorMaterials, CurrentPlayer, GameAssets, GameResultResource, HasTileOnTop, HiveTile, IsInGame, IsOnTopOf, Level, MainCamera, PlacableTileState, PlayerInventory, PositionCache, PositionCacheEntry, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites};
 pub use crate::data::enums::InsectType::*;
 use crate::data::enums::Player::{Player1, Player2};
 use crate::data::enums::{AppState, GameResult, InsectType, Player};
 use crate::hex_coordinate::ALL_DIRECTIONS;
 use crate::ui::{s_setup_ui, s_update_ui_for_round};
 use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
+use bevy::ecs::query::QueryEntityError;
 use bevy::math::vec3;
 use bevy::prelude::*;
 use bevy::reflect::List;
@@ -59,7 +57,7 @@ fn main() {
         )
         .insert_resource(PositionCache::default())
         .insert_resource(CurrentPlayer { player: Player1 })
-        .insert_resource(GameResultResource{result:None})
+        .insert_resource(GameResultResource { result: None })
         .run();
 }
 
@@ -113,7 +111,7 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
         renderer: MaterialMesh2dBundle {
             mesh: game_assets.mesh.clone(),
             material: game_assets.color_materials.grey.clone(),
-            transform: origin.get_transform(-2.),
+            transform: origin.get_transform(&Level(0),-2.),
             ..default()
         },
         possible_placement_tag: Default::default(),
@@ -133,7 +131,7 @@ fn s_update_camera(
 
     let vectors: Vec<_> = keys
         .iter()
-        .map(|p| p.get_transform(0.).translation)
+        .map(|p| p.get_transform(&Level(0),0.).translation)
         .collect();
 
     let min = vectors.clone().into_iter().reduce(Vec3::min);
@@ -171,14 +169,14 @@ fn s_update_camera(
 
 fn s_build_cache(
     mut position_cache: ResMut<PositionCache>,
-    tile_queue: Query<(&HexCoordinate, &IsInGame, &Player, &InsectType)>,
+    tile_queue: Query<
+        (Entity, &HexCoordinate, &IsInGame, &Player, &InsectType),
+        Without<HasTileOnTop>,
+    >,
 ) {
     position_cache.0.clear();
 
-    for (hex, hive_tile, player, insect_type) in tile_queue.iter() {
-        if let Some(_) = hive_tile.tile_on_top {
-            continue;
-        }
+    for (entity, hex, hive_tile, player, insect_type) in tile_queue.iter() {
         if position_cache.0.contains_key(hex) {
             panic!();
         }
@@ -187,6 +185,7 @@ fn s_build_cache(
             PositionCacheEntry {
                 player: player.clone(),
                 _insect_type: insect_type.clone(),
+                entity,
             },
         );
     }
@@ -196,7 +195,7 @@ fn s_cleanup_tile_placement(
     q_possible_placements: Query<Entity, With<PossiblePlacementTag>>,
     q_placable_tiles: Query<Entity, With<PlacableTileState>>,
     q_in_game_tiles: Query<&IsInGame>,
-    mut q_transforms_with_hex_coord: Query<(&mut Transform, &HexCoordinate)>,
+    mut q_transforms_with_hex_coord: Query<(&mut Transform, &HexCoordinate, &Level)>,
     mut commands: Commands,
 ) {
     if !q_in_game_tiles.is_empty() {
@@ -208,8 +207,8 @@ fn s_cleanup_tile_placement(
         commands.entity(entity).despawn_recursive();
     }
 
-    for (mut transform, hex) in &mut q_transforms_with_hex_coord {
-        *transform = hex.get_transform(0.);
+    for (mut transform, hex, level) in &mut q_transforms_with_hex_coord {
+        *transform = hex.get_transform(level,0.);
     }
 }
 
@@ -311,6 +310,7 @@ fn s_spawn_tiles_from_inventory(
             player: current_player.clone(),
             placable_tile_tag: PlacableTileState {},
             insect,
+            level: Level(0),
         };
 
         let child = commands
@@ -333,7 +333,7 @@ fn s_update_idle(
     world_cursor: Res<WorldCursor>,
     mut q_placable_tiles: Query<
         (Entity, &mut Transform, &mut Player),
-        (Without<PossiblePlacementTag>, Without<Camera2d>),
+        (Without<PossiblePlacementTag>, Without<Camera2d>, Without<HasTileOnTop>),
     >,
     mut commands: Commands,
     q_camera: Query<(&OrthographicProjection, &Transform), With<Camera2d>>,
@@ -387,15 +387,21 @@ fn s_move_tile(
     world_cursor: Res<WorldCursor>,
     // mut q_transform:  Query<(&mut Transform)>,
     mut q_possible_placements: Query<&mut Transform, Without<PossiblePlacementTag>>,
-    mut m_placement_markers: Query<(&Transform, &HexCoordinate, &PossiblePlacementTag)>,
+    mut m_placement_markers: Query<(&Transform, &HexCoordinate), (With<PossiblePlacementTag>)>,
+    mut q_hex_coord_of_existing: Query<
+        (&HexCoordinate),
+        (Without<PossiblePlacementTag>, With<IsInGame>),
+    >,
     q_placable_tile_state: Query<&PlacableTileState>,
     mut q_inventory: Query<(&mut PlayerInventory, &Player)>,
-    mut q_is_in_game: Query<(&mut IsInGame,)>,
+     q_level: Query<(&Level,)>,
+    mut q_is_on_top_of: Query<(&mut IsOnTopOf,)>,
     q_insect: Query<&InsectType>,
     mut commands: Commands,
     selected_tile: Res<SelectedTile>,
     mut next_state: ResMut<NextState<AppState>>,
     current_player: Res<CurrentPlayer>,
+    position_cache: Res<PositionCache>,
 ) {
     let selected_entity = selected_tile.0;
 
@@ -409,23 +415,25 @@ fn s_move_tile(
 
     let mut inventory = inventory.unwrap();
 
+    //    let mut current_position = q_hex_coord_of_existing.get(selected_tile.0) ;
+
     match world_cursor.press_state {
         // PressState::Released => {}
         // PressState::JustPressed => {}
         PressState::Pressed => {
             if let Ok(mut transform) = q_possible_placements.get_mut(selected_entity) {
                 transform.translation =
-                    Vec3::new(world_cursor.position.x, world_cursor.position.y, 0.);
+                    Vec3::new(world_cursor.position.x, world_cursor.position.y, 100.);
             }
         }
 
         //PressState::JustReleased => {}
         _ => {
             if let Ok(selected_transform) = q_possible_placements.get_mut(selected_entity) {
-                for (possible_placement, possible_hex_coordinate, _) in &mut m_placement_markers {
+                for (possible_placement, possible_hex_coordinate) in &mut m_placement_markers {
                     if possible_placement
-                        .translation
-                        .distance(selected_transform.translation)
+                        .translation.with_z(0.)
+                        .distance(selected_transform.translation.with_z(0.))
                         < 50.
                     {
                         // commands.spawn(HiveTile::new(*hex_coordinate, &game_assets, current_player.player));
@@ -443,15 +451,22 @@ fn s_move_tile(
 
                                 inventory.pieces = new_pieces;
 
-
-
                                 commands
                                     .entity(selected_entity)
-                                    .insert(IsInGame { tile_on_top: None })
+                                    .insert(IsInGame {})
                                     .insert(possible_hex_coordinate.clone())
                                     .remove::<PlacableTileState>();
                             }
                             Err(_) => {
+                                match q_is_on_top_of.get(selected_entity) {
+                                    Ok(is_on_top_of) => {
+                                        commands
+                                            .entity(is_on_top_of.0.tile_below)
+                                            .remove::<HasTileOnTop>();
+                                    }
+                                    Err(_) => {}
+                                }
+
                                 commands
                                     .entity(selected_entity)
                                     .insert(possible_hex_coordinate.clone());
@@ -461,7 +476,16 @@ fn s_move_tile(
                         inventory.moves_played += 1;
                         next_state.set(AppState::MoveFinished);
 
-
+                        match position_cache.0.get(&possible_hex_coordinate) {
+                            None => {
+                                commands.entity(selected_entity).remove::<IsOnTopOf>().insert(Level(0));}
+                            Some(tile_below) => {
+                                commands.entity(tile_below.entity).insert(HasTileOnTop {});
+                                let (level) = q_level.get(tile_below.entity).expect("Every playable tile needs to have a Level component");
+                                let new_level = Level(level.0.0+1);
+                                commands.entity(selected_entity).insert(IsOnTopOf{ tile_below: tile_below.entity}).insert(new_level);
+                            }
+                        };
 
                         return;
                     }

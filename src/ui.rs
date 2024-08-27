@@ -7,7 +7,7 @@ use bevy::prelude::*;
 pub struct UIStatusText {}
 
 pub fn s_update_ui_for_round(
-    mut q_text: Query<(&mut Text),(With<UIStatusText>)>,
+    mut q_text: Query<(&mut Text), (With<UIStatusText>)>,
     game_assets: Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
     state: Res<GameResultResource>,
@@ -17,7 +17,6 @@ pub fn s_update_ui_for_round(
 
     let mut string;
 
-
     match &state.result {
         None => {
             string = match current_player.player {
@@ -26,27 +25,24 @@ pub fn s_update_ui_for_round(
             };
             color = game_assets.get_color_for_player(current_player.player);
         }
-        Some(game_result) => {
-            match  game_result{
-                GameResult::Draw => {
-                    color = Color::LinearRgba(LinearRgba {
-                        red: 0.5,
-                        green: 0.5,
-                        blue: 0.5,
-                        alpha: 1.0,
-                    });
-                    string = "Draw!".to_string();
-                }
-                GameResult::PlayerWon(player_that_won) => {
-                    string = match player_that_won {
-                        Player::Player1 => "Player1 won!!".to_string(),
-                        Player::Player2 => "Player2 won!!".to_string(),
-                    };
-                    color = game_assets.get_color_for_player(current_player.player);
-                }
+        Some(game_result) => match game_result {
+            GameResult::Draw => {
+                color = Color::LinearRgba(LinearRgba {
+                    red: 0.5,
+                    green: 0.5,
+                    blue: 0.5,
+                    alpha: 1.0,
+                });
+                string = "Draw!".to_string();
             }
-
-        }
+            GameResult::PlayerWon(player_that_won) => {
+                string = match player_that_won {
+                    Player::Player1 => "Player1 won!!".to_string(),
+                    Player::Player2 => "Player2 won!!".to_string(),
+                };
+                color = game_assets.get_color_for_player(current_player.player);
+            }
+        },
     }
 
     text.sections[0].style.color = color;

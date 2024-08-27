@@ -66,6 +66,7 @@ impl Sprites {
 pub struct PositionCacheEntry {
     pub(crate) player: Player,
     pub(crate) _insect_type: InsectType,
+    pub(crate) entity: Entity,
 }
 
 #[derive(Resource, Default)]
@@ -132,14 +133,19 @@ pub struct PlacableTileState {}
 pub struct PossiblePlacementTag {}
 
 #[derive(Component, Default)]
-pub struct IsInGame {
-    pub(crate) tile_on_top: Option<Entity>,
-}
+pub struct IsInGame {}
 
 #[derive(Component)]
 pub struct IsOnTopOf {
-    pub tile_on_top: Entity,
+    pub tile_below: Entity,
 }
+
+
+#[derive(Component, Copy, Clone)]
+pub struct Level (pub u32);
+
+#[derive(Component)]
+pub struct HasTileOnTop {}
 
 #[derive(Bundle)]
 pub struct HiveTile {
@@ -147,6 +153,7 @@ pub struct HiveTile {
     pub(crate) player: Player,
     pub(crate) placable_tile_tag: PlacableTileState,
     pub(crate) insect: InsectType,
+    pub(crate) level:Level,
 }
 
 #[derive(Bundle)]

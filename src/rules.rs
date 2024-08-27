@@ -1,9 +1,9 @@
-use bevy::ecs::query::QueryEntityError;
-use bevy::math::Vec3;
-use crate::data::components::{CurrentPlayer, GameAssets, IsInGame, IsOnTopOf, PositionCache, PossiblePlacementMarker, SelectedTile};
+use crate::data::components::{CurrentPlayer, GameAssets, HasTileOnTop, IsInGame, IsOnTopOf, Level, PositionCache, PossiblePlacementMarker, SelectedTile};
 use crate::data::enums::{InsectType, Player};
 use crate::hex_coordinate::{HexCoordinate, ALL_DIRECTIONS};
-use bevy::prelude::{default, Commands, Query, Res, With, Entity};
+use bevy::ecs::query::QueryEntityError;
+use bevy::math::Vec3;
+use bevy::prelude::{default, Commands, Entity, Query, Res, With, Without};
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashSet;
 
@@ -13,11 +13,12 @@ pub fn s_spawn_placement_markers(
     q_insect: Query<&InsectType>,
     q_hex_coord: Query<&HexCoordinate, With<IsInGame>>,
     q_is_hive_tile: Query<(), With<IsInGame>>,
-    q_is_on_top_of:  Query<(), (With<IsOnTopOf>,With<IsInGame>)>,
+    q_is_topmost: Query<(), (With<IsOnTopOf>, Without<HasTileOnTop>)>,
     game_assets: Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
     selected_tile: Res<SelectedTile>,
     mut commands: Commands,
+    q_is_on_top_of: Query<&IsOnTopOf>,
 ) {
     let is_new_piece = !q_is_hive_tile.contains(selected_tile.0);
 
@@ -37,8 +38,10 @@ pub fn s_spawn_placement_markers(
 
         let position_cache_without_selected = position_cache.get_without(&selected_tile_position);
 
-        if !check_moving_piece_allowed(&position_cache_without_selected) {
-            return;
+        if !q_is_on_top_of.contains(selected_tile.0) {
+            if !check_moving_piece_allowed(&position_cache_without_selected) {
+                return;
+            }
         }
 
         valid_moves = match insect_type {
@@ -54,9 +57,12 @@ pub fn s_spawn_placement_markers(
             InsectType::Grasshopper => {
                 get_moves_for_grasshopper(position_cache_without_selected, selected_tile_position)
             }
-            InsectType::Beetle => {
-                get_moves_for_beetle(position_cache_without_selected, selected_tile_position,q_is_on_top_of,selected_tile.0)
-            }
+            InsectType::Beetle => get_moves_for_beetle(
+                position_cache_without_selected,
+                selected_tile_position,
+                q_is_topmost,
+                selected_tile.0,
+            ),
         }
     }
 
@@ -65,7 +71,9 @@ pub fn s_spawn_placement_markers(
             renderer: MaterialMesh2dBundle {
                 mesh: game_assets.mesh.clone(),
                 material: game_assets.color_materials.grey.clone(),
-                transform: valid_move.get_transform(-2.).with_scale(Vec3::new(1.2,1.2,1.2)),
+                transform: valid_move
+                    .get_transform(&Level(0),-2.)
+                    .with_scale(Vec3::new(1.2, 1.2, 1.2)),
                 ..default()
             },
             possible_placement_tag: Default::default(),
@@ -85,14 +93,10 @@ fn get_moves_for_queen(
 fn get_moves_for_beetle(
     position_cache: PositionCache,
     current_position: HexCoordinate,
-    q_is_on_top_of: Query<(), (With<IsOnTopOf>,With<IsInGame>)>,
+    q_is_topmost: Query<(), (With<IsOnTopOf>, Without<HasTileOnTop>)>,
     entity: Entity,
 ) -> Vec<HexCoordinate> {
-
-    let mut can_move_to_empty= match q_is_on_top_of.get(entity) {
-        Ok(_) => {true}
-        Err(_) => {false}
-    };
+    let can_move_to_empty = q_is_topmost.contains(entity);
 
     let mut result = vec![];
 
