@@ -12,6 +12,7 @@ use crate::data::enums::{AppState, GameResult, InsectType, Player};
 use crate::hex_coordinate::ALL_DIRECTIONS;
 use crate::ui::{s_setup_ui, s_update_ui_for_round};
 use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
+use bevy::asset::AssetMetaCheck;
 use bevy::ecs::query::QueryEntityError;
 use bevy::math::vec3;
 use bevy::prelude::*;
@@ -30,7 +31,13 @@ mod world_cursor;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, WorldCursorPlugin))
+        .add_plugins((
+            DefaultPlugins.set(AssetPlugin {
+                meta_check: AssetMetaCheck::Never,
+                ..default()
+            }),
+            WorldCursorPlugin,
+        ))
         .init_state::<AppState>()
         .add_systems(Startup, (setup_assets, setup.after(setup_assets)))
         .add_systems(Startup, s_setup_ui)
