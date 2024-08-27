@@ -167,7 +167,11 @@ fn s_update_camera(
                 );
             }
         }
-        (_, _) => {}
+        (_, _) => {
+            for (mut projection, mut transform) in &mut q_camera {
+                projection.scaling_mode = ScalingMode::FixedVertical(700.);
+            }
+        }
     }
 }
 

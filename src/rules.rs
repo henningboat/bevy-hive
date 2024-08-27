@@ -12,7 +12,7 @@ use bevy::utils::HashSet;
 
 pub fn s_spawn_placement_markers(
     position_cache: Res<PositionCache>,
-    q_player: Query<&Player, (With<IsInGame>,Without<HasTileOnTop>)>,
+    q_player: Query<&Player, (With<IsInGame>, Without<HasTileOnTop>)>,
     q_insect: Query<&InsectType>,
     q_hex_coord: Query<&HexCoordinate, With<IsInGame>>,
     q_is_hive_tile: Query<(), With<IsInGame>>,
