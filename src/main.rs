@@ -1,8 +1,11 @@
 //! Renders an animated sprite by loading all animation frames from a single image (a sprite sheet)
 //! into a texture atlas, and changing the displayed image periodically.
 
-use std::ops::Deref;
-use crate::data::components::{ColorMaterials, CurrentPlayer, GameAssets, GameResultResource, HasTileOnTop, HiveTile, IsInGame, IsOnTopOf, Level, MainCamera, PlacableTileState, PlayerInventory, PositionCache, PositionCacheEntry, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites};
+use crate::data::components::{
+    ColorMaterials, CurrentPlayer, GameAssets, GameResultResource, HasTileOnTop, HiveTile,
+    IsInGame, IsOnTopOf, Level, MainCamera, PlacableTileState, PlayerInventory, PositionCache,
+    PositionCacheEntry, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites,
+};
 pub use crate::data::enums::InsectType::*;
 use crate::data::enums::Player::{Player1, Player2};
 use crate::data::enums::{AppState, GameResult, InsectType, Player};
@@ -16,6 +19,7 @@ use bevy::reflect::List;
 use bevy::render::camera::ScalingMode;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use hex_coordinate::HexCoordinate;
+use std::ops::Deref;
 use std::process::Command;
 
 mod data;
@@ -111,7 +115,7 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
         renderer: MaterialMesh2dBundle {
             mesh: game_assets.mesh.clone(),
             material: game_assets.color_materials.grey.clone(),
-            transform: origin.get_transform(&Level(0),-2.),
+            transform: origin.get_transform(&Level(0), -2.),
             ..default()
         },
         possible_placement_tag: Default::default(),
@@ -131,7 +135,7 @@ fn s_update_camera(
 
     let vectors: Vec<_> = keys
         .iter()
-        .map(|p| p.get_transform(&Level(0),0.).translation)
+        .map(|p| p.get_transform(&Level(0), 0.).translation)
         .collect();
 
     let min = vectors.clone().into_iter().reduce(Vec3::min);
@@ -208,7 +212,7 @@ fn s_cleanup_tile_placement(
     }
 
     for (mut transform, hex, level) in &mut q_transforms_with_hex_coord {
-        *transform = hex.get_transform(level,0.);
+        *transform = hex.get_transform(level, 0.);
     }
 }
 
@@ -333,7 +337,11 @@ fn s_update_idle(
     world_cursor: Res<WorldCursor>,
     mut q_placable_tiles: Query<
         (Entity, &mut Transform, &mut Player),
-        (Without<PossiblePlacementTag>, Without<Camera2d>, Without<HasTileOnTop>),
+        (
+            Without<PossiblePlacementTag>,
+            Without<Camera2d>,
+            Without<HasTileOnTop>,
+        ),
     >,
     mut commands: Commands,
     q_camera: Query<(&OrthographicProjection, &Transform), With<Camera2d>>,
@@ -394,7 +402,7 @@ fn s_move_tile(
     >,
     q_placable_tile_state: Query<&PlacableTileState>,
     mut q_inventory: Query<(&mut PlayerInventory, &Player)>,
-     q_level: Query<(&Level,)>,
+    q_level: Query<(&Level,)>,
     mut q_is_on_top_of: Query<(&mut IsOnTopOf,)>,
     q_insect: Query<&InsectType>,
     mut commands: Commands,
@@ -432,7 +440,8 @@ fn s_move_tile(
             if let Ok(selected_transform) = q_possible_placements.get_mut(selected_entity) {
                 for (possible_placement, possible_hex_coordinate) in &mut m_placement_markers {
                     if possible_placement
-                        .translation.with_z(0.)
+                        .translation
+                        .with_z(0.)
                         .distance(selected_transform.translation.with_z(0.))
                         < 50.
                     {
@@ -478,12 +487,23 @@ fn s_move_tile(
 
                         match position_cache.0.get(&possible_hex_coordinate) {
                             None => {
-                                commands.entity(selected_entity).remove::<IsOnTopOf>().insert(Level(0));}
+                                commands
+                                    .entity(selected_entity)
+                                    .remove::<IsOnTopOf>()
+                                    .insert(Level(0));
+                            }
                             Some(tile_below) => {
                                 commands.entity(tile_below.entity).insert(HasTileOnTop {});
-                                let (level) = q_level.get(tile_below.entity).expect("Every playable tile needs to have a Level component");
-                                let new_level = Level(level.0.0+1);
-                                commands.entity(selected_entity).insert(IsOnTopOf{ tile_below: tile_below.entity}).insert(new_level);
+                                let (level) = q_level
+                                    .get(tile_below.entity)
+                                    .expect("Every playable tile needs to have a Level component");
+                                let new_level = Level(level.0 .0 + 1);
+                                commands
+                                    .entity(selected_entity)
+                                    .insert(IsOnTopOf {
+                                        tile_below: tile_below.entity,
+                                    })
+                                    .insert(new_level);
                             }
                         };
 

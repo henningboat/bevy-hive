@@ -140,9 +140,8 @@ pub struct IsOnTopOf {
     pub tile_below: Entity,
 }
 
-
 #[derive(Component, Copy, Clone)]
-pub struct Level (pub u32);
+pub struct Level(pub u32);
 
 #[derive(Component)]
 pub struct HasTileOnTop {}
@@ -153,7 +152,7 @@ pub struct HiveTile {
     pub(crate) player: Player,
     pub(crate) placable_tile_tag: PlacableTileState,
     pub(crate) insect: InsectType,
-    pub(crate) level:Level,
+    pub(crate) level: Level,
 }
 
 #[derive(Bundle)]

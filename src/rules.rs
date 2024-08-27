@@ -1,4 +1,7 @@
-use crate::data::components::{CurrentPlayer, GameAssets, HasTileOnTop, IsInGame, IsOnTopOf, Level, PositionCache, PossiblePlacementMarker, SelectedTile};
+use crate::data::components::{
+    CurrentPlayer, GameAssets, HasTileOnTop, IsInGame, IsOnTopOf, Level, PositionCache,
+    PossiblePlacementMarker, SelectedTile,
+};
 use crate::data::enums::{InsectType, Player};
 use crate::hex_coordinate::{HexCoordinate, ALL_DIRECTIONS};
 use bevy::ecs::query::QueryEntityError;
@@ -72,7 +75,7 @@ pub fn s_spawn_placement_markers(
                 mesh: game_assets.mesh.clone(),
                 material: game_assets.color_materials.grey.clone(),
                 transform: valid_move
-                    .get_transform(&Level(0),-2.)
+                    .get_transform(&Level(0), -2.)
                     .with_scale(Vec3::new(1.2, 1.2, 1.2)),
                 ..default()
             },

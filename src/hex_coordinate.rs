@@ -1,6 +1,6 @@
+use crate::data::components::Level;
 use bevy::math::{Quat, Vec3};
 use bevy::prelude::{Component, Transform};
-use crate::data::components::Level;
 
 #[derive(Component, Default, Copy, Clone, Hash, Debug, Eq, PartialEq)]
 pub struct HexCoordinate {
@@ -19,8 +19,9 @@ impl HexCoordinate {
         Transform::from_translation(Vec3 {
             x: x * 100.,
             y: self.y as f32 * 90. + (level.0 as f32 * 10.),
-            z: depth_offset + 10.*level.0 as f32,
-        }).with_rotation(Quat::from_rotation_z(level.0 as f32 * 5.0))
+            z: depth_offset + 10. * level.0 as f32,
+        })
+        .with_rotation(Quat::from_rotation_z(level.0 as f32 * 5.0))
     }
 
     pub fn get_relative(&self, direction: &HexDirection) -> HexCoordinate {
