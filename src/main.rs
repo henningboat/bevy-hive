@@ -12,15 +12,11 @@ use crate::data::enums::{AppState, GameResult, InsectType, Player};
 use crate::hex_coordinate::ALL_DIRECTIONS;
 use crate::ui::{s_setup_ui, s_update_ui_for_round};
 use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
-use bevy::ecs::query::QueryEntityError;
 use bevy::math::vec3;
 use bevy::prelude::*;
-use bevy::reflect::List;
 use bevy::render::camera::ScalingMode;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use hex_coordinate::HexCoordinate;
-use std::ops::Deref;
-use std::process::Command;
 
 mod data;
 mod hex_coordinate;
@@ -168,7 +164,7 @@ fn s_update_camera(
             }
         }
         (_, _) => {
-            for (mut projection, mut transform) in &mut q_camera {
+            for (mut projection, _) in &mut q_camera {
                 projection.scaling_mode = ScalingMode::FixedVertical(700.);
             }
         }
@@ -184,7 +180,7 @@ fn s_build_cache(
 ) {
     position_cache.0.clear();
 
-    for (entity, hex, hive_tile, player, insect_type) in tile_queue.iter() {
+    for (entity, hex, _, player, insect_type) in tile_queue.iter() {
         if position_cache.0.contains_key(hex) {
             panic!();
         }
@@ -399,15 +395,11 @@ fn s_move_tile(
     world_cursor: Res<WorldCursor>,
     // mut q_transform:  Query<(&mut Transform)>,
     mut q_possible_placements: Query<&mut Transform, Without<PossiblePlacementTag>>,
-    mut m_placement_markers: Query<(&Transform, &HexCoordinate), (With<PossiblePlacementTag>)>,
-    mut q_hex_coord_of_existing: Query<
-        (&HexCoordinate),
-        (Without<PossiblePlacementTag>, With<IsInGame>),
-    >,
+    mut m_placement_markers: Query<(&Transform, &HexCoordinate), With<PossiblePlacementTag>>,
     q_placable_tile_state: Query<&PlacableTileState>,
     mut q_inventory: Query<(&mut PlayerInventory, &Player)>,
     q_level: Query<(&Level,)>,
-    mut q_is_on_top_of: Query<(&mut IsOnTopOf,)>,
+    q_is_on_top_of: Query<(&mut IsOnTopOf,)>,
     q_insect: Query<&InsectType>,
     mut commands: Commands,
     selected_tile: Res<SelectedTile>,
@@ -498,7 +490,7 @@ fn s_move_tile(
                             }
                             Some(tile_below) => {
                                 commands.entity(tile_below.entity).insert(HasTileOnTop {});
-                                let (level) = q_level
+                                let level = q_level
                                     .get(tile_below.entity)
                                     .expect("Every playable tile needs to have a Level component");
                                 let new_level = Level(level.0 .0 + 1);

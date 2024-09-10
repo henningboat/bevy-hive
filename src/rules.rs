@@ -4,7 +4,6 @@ use crate::data::components::{
 };
 use crate::data::enums::{InsectType, Player};
 use crate::hex_coordinate::{HexCoordinate, ALL_DIRECTIONS};
-use bevy::ecs::query::QueryEntityError;
 use bevy::math::Vec3;
 use bevy::prelude::{default, Commands, Entity, Query, Res, With, Without};
 use bevy::sprite::MaterialMesh2dBundle;

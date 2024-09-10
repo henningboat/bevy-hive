@@ -1,5 +1,5 @@
 use crate::data::components::{CurrentPlayer, GameAssets, GameResultResource};
-use crate::data::enums::{AppState, GameResult, Player};
+use crate::data::enums::{GameResult, Player};
 use bevy::prelude::Commands;
 use bevy::prelude::*;
 
@@ -7,15 +7,15 @@ use bevy::prelude::*;
 pub struct UIStatusText {}
 
 pub fn s_update_ui_for_round(
-    mut q_text: Query<(&mut Text), (With<UIStatusText>)>,
+    mut q_text: Query<&mut Text, With<UIStatusText>>,
     game_assets: Res<GameAssets>,
     current_player: Res<CurrentPlayer>,
     state: Res<GameResultResource>,
 ) {
-    let mut text: &mut bevy::prelude::Text = &mut q_text.single_mut();
-    let mut color;
+    let text: &mut bevy::prelude::Text = &mut q_text.single_mut();
+    let color;
 
-    let mut string;
+    let string;
 
     match &state.result {
         None => {
