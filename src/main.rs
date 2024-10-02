@@ -19,6 +19,7 @@ use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use hex_coordinate::HexCoordinate;
 
 mod data;
+mod game_model;
 mod hex_coordinate;
 mod rules;
 mod ui;
