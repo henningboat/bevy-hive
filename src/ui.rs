@@ -1,7 +1,8 @@
-use crate::data::components::{CurrentPlayer, GameAssets, GameResultResource};
+use crate::data::components::{GameAssets, GameResultResource};
 use crate::data::enums::{GameResult, Player};
 use bevy::prelude::Commands;
 use bevy::prelude::*;
+use crate::game_model::game_state::GameState;
 
 #[derive(Component)]
 pub struct UIStatusText {}
@@ -9,7 +10,7 @@ pub struct UIStatusText {}
 pub fn s_update_ui_for_round(
     mut q_text: Query<&mut Text, With<UIStatusText>>,
     game_assets: Res<GameAssets>,
-    current_player: Res<CurrentPlayer>,
+    game_state: Res<GameState>,
     state: Res<GameResultResource>,
 ) {
     let text: &mut bevy::prelude::Text = &mut q_text.single_mut();
@@ -19,11 +20,11 @@ pub fn s_update_ui_for_round(
 
     match &state.result {
         None => {
-            string = match current_player.player {
+            string = match game_state.current_player_turn {
                 Player::Player1 => "Player1".to_string(),
                 Player::Player2 => "Player2".to_string(),
             };
-            color = game_assets.get_color_for_player(current_player.player);
+            color = game_assets.get_color_for_player(game_state.current_player_turn);
         }
         Some(game_result) => match game_result {
             GameResult::Draw => {
@@ -40,7 +41,7 @@ pub fn s_update_ui_for_round(
                     Player::Player1 => "Player1 won!!".to_string(),
                     Player::Player2 => "Player2 won!!".to_string(),
                 };
-                color = game_assets.get_color_for_player(current_player.player);
+                color = game_assets.get_color_for_player(game_state.current_player_turn);
             }
         },
     }

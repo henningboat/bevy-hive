@@ -6,12 +6,6 @@ use bevy::asset::Handle;
 use bevy::color::{Color, LinearRgba};
 use bevy::prelude::{Bundle, ColorMaterial, Component, Entity, Image, Resource};
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
-use std::collections::HashMap;
-
-#[derive(Resource, Copy, Clone)]
-pub struct CurrentPlayer {
-    pub(crate) player: Player,
-}
 
 #[derive(Resource)]
 pub struct GameAssets {
@@ -68,59 +62,56 @@ pub struct PositionCacheEntry {
     pub(crate) _insect_type: InsectType,
     pub(crate) entity: Entity,
 }
-
-#[derive(Resource, Default)]
-pub struct PositionCache(pub(crate) HashMap<HexCoordinate, PositionCacheEntry>);
-
-impl PositionCache {
-    pub fn get_without(&self, without: &HexCoordinate) -> PositionCache {
-        let mut new_has_map: HashMap<HexCoordinate, PositionCacheEntry> = HashMap::new();
-
-        for coordinate in self.0.keys() {
-            if coordinate != without {
-                new_has_map.insert(*coordinate, self.0.get(coordinate).unwrap().clone());
-            }
-        }
-
-        PositionCache(new_has_map)
-    }
-
-    pub(crate) fn get_surrounding_slidable_tiles(
-        &self,
-        new_position: HexCoordinate,
-        ignore: &Vec<HexCoordinate>,
-    ) -> Vec<HexCoordinate> {
-        let mut valid_positions = vec![];
-
-        for direction in ALL_DIRECTIONS {
-            let relative_position = new_position.get_relative(direction);
-            if self.0.contains_key(&relative_position) {
-                continue;
-            }
-
-            if ignore.contains(&relative_position) {
-                continue;
-            }
-
-            let sides = direction.get_adjacent_directions();
-
-            let mut filled_space_count = 0;
-            for side in sides {
-                if self.0.contains_key(&new_position.get_relative(side)) {
-                    filled_space_count += 1;
-                }
-            }
-            if filled_space_count == 1 {
-                valid_positions.push(relative_position);
-            }
-        }
-
-        valid_positions
-    }
-}
+//
+// impl PositionCache {
+//     pub fn get_without(&self, without: &HexCoordinate) -> PositionCache {
+//         let mut new_has_map: HashMap<HexCoordinate, PositionCacheEntry> = HashMap::new();
+//
+//         for coordinate in self.0.keys() {
+//             if coordinate != without {
+//                 new_has_map.insert(*coordinate, self.0.get(coordinate).unwrap().clone());
+//             }
+//         }
+//
+//         PositionCache(new_has_map)
+//     }
+//
+//     pub(crate) fn get_surrounding_slidable_tiles(
+//         &self,
+//         new_position: HexCoordinate,
+//         ignore: &Vec<HexCoordinate>,
+//     ) -> Vec<HexCoordinate> {
+//         let mut valid_positions = vec![];
+//
+//         for direction in ALL_DIRECTIONS {
+//             let relative_position = new_position.get_relative(direction);
+//             if self.0.contains_key(&relative_position) {
+//                 continue;
+//             }
+//
+//             if ignore.contains(&relative_position) {
+//                 continue;
+//             }
+//
+//             let sides = direction.get_adjacent_directions();
+//
+//             let mut filled_space_count = 0;
+//             for side in sides {
+//                 if self.0.contains_key(&new_position.get_relative(side)) {
+//                     filled_space_count += 1;
+//                 }
+//             }
+//             if filled_space_count == 1 {
+//                 valid_positions.push(relative_position);
+//             }
+//         }
+//
+//         valid_positions
+//     }
+// }
 
 #[derive(Resource)]
-pub struct SelectedTile(pub Entity);
+pub struct SelectedTile(pub Entity, pub u32);
 
 /// Used to help identify our main camera
 #[derive(Component)]

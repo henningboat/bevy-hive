@@ -16,7 +16,7 @@ pub enum Player {
     Player2,
 }
 
-#[derive(Component, Default, Copy, Clone, PartialEq)]
+#[derive(Component, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum InsectType {
     #[default]
     Ant,

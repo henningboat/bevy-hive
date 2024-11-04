@@ -2,13 +2,15 @@
 //! into a texture atlas, and changing the displayed image periodically.
 
 use crate::data::components::{
-    ColorMaterials, CurrentPlayer, GameAssets, GameResultResource, HasTileOnTop, HiveTile,
-    IsInGame, IsOnTopOf, Level, MainCamera, PlacableTileState, PlayerInventory, PositionCache,
-    PositionCacheEntry, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites,
+    ColorMaterials, GameAssets, GameResultResource, HasTileOnTop, HiveTile, IsInGame, IsOnTopOf,
+    Level, MainCamera, PlacableTileState, PlayerInventory,
+PositionCacheEntry,
+    PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites,
 };
 pub use crate::data::enums::InsectType::*;
 use crate::data::enums::Player::{Player1, Player2};
 use crate::data::enums::{AppState, GameResult, InsectType, Player};
+use crate::game_model::game_state::{create_game_state, GameState, Piece};
 use crate::hex_coordinate::ALL_DIRECTIONS;
 use crate::ui::{s_setup_ui, s_update_ui_for_round};
 use crate::world_cursor::{PressState, WorldCursor, WorldCursorPlugin};
@@ -16,6 +18,7 @@ use bevy::math::vec3;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+use bevy::utils::HashSet;
 use hex_coordinate::HexCoordinate;
 
 mod data;
@@ -32,33 +35,26 @@ fn main() {
         .add_systems(Startup, (setup_assets, setup.after(setup_assets)))
         .add_systems(Startup, s_setup_ui)
         .add_systems(OnEnter(AppState::Init), s_init)
-        .add_systems(Update, (s_build_cache, s_update_camera))
-        .add_systems(OnEnter(AppState::Idle), s_spawn_tiles_from_inventory)
-        .add_systems(Update, s_update_ui_for_round)
+        .add_systems(Update, s_update_camera)
+        .add_systems(OnEnter(AppState::Idle), s_init_round)
+         .add_systems(Update, s_update_ui_for_round)
         .add_systems(
             Update,
             s_update_idle
-                .after(s_build_cache)
                 .run_if(in_state(AppState::Idle)),
-        )
-        .add_systems(
-            OnEnter(AppState::MovingTile),
-            rules::s_spawn_placement_markers,
         )
         .add_systems(
             Update,
             s_move_tile
-                .after(s_build_cache)
                 .run_if(in_state(AppState::MovingTile)),
         )
         .add_systems(OnExit(AppState::MovingTile), s_cleanup_tile_placement)
         .add_systems(
             OnEnter(AppState::MoveFinished),
-            (s_build_cache, s_enter_move_finished.after(s_build_cache)),
+            (s_enter_move_finished),
         )
-        .insert_resource(PositionCache::default())
-        .insert_resource(CurrentPlayer { player: Player1 })
         .insert_resource(GameResultResource { result: None })
+        .insert_resource(create_game_state())
         .run();
 }
 
@@ -119,20 +115,21 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
         hex_coordinate: origin,
     };
     commands.spawn(bundle);
-
-    commands.spawn((PlayerInventory::new(), Player1));
-    commands.spawn((PlayerInventory::new(), Player2));
 }
 fn s_update_camera(
-    res_position_cache: Res<PositionCache>,
+    game_state: Res<GameState>,
     res_time: Res<Time>,
     mut q_camera: Query<(&mut OrthographicProjection, &mut Transform)>,
 ) {
-    let keys: Vec<_> = res_position_cache.0.keys().collect();
+    let keys: Vec<_> = game_state
+        .pieces
+        .iter()
+        .filter(|piece| piece.position != None)
+        .collect();
 
     let vectors: Vec<_> = keys
         .iter()
-        .map(|p| p.get_transform(&Level(0), 0.).translation)
+        .map(|p| p.position.unwrap().get_transform(&Level(0), 0.).translation)
         .collect();
 
     let min = vectors.clone().into_iter().reduce(Vec3::min);
@@ -171,30 +168,30 @@ fn s_update_camera(
         }
     }
 }
-
-fn s_build_cache(
-    mut position_cache: ResMut<PositionCache>,
-    tile_queue: Query<
-        (Entity, &HexCoordinate, &IsInGame, &Player, &InsectType),
-        Without<HasTileOnTop>,
-    >,
-) {
-    position_cache.0.clear();
-
-    for (entity, hex, _, player, insect_type) in tile_queue.iter() {
-        if position_cache.0.contains_key(hex) {
-            panic!();
-        }
-        position_cache.0.insert(
-            *hex,
-            PositionCacheEntry {
-                player: player.clone(),
-                _insect_type: insect_type.clone(),
-                entity,
-            },
-        );
-    }
-}
+//
+// fn s_build_cache(
+//     mut position_cache: ResMut<PositionCache>,
+//     tile_queue: Query<
+//         (Entity, &HexCoordinate, &IsInGame, &Player, &InsectType),
+//         Without<HasTileOnTop>,
+//     >,
+// ) {
+//     position_cache.0.clear();
+//
+//     for (entity, hex, _, player, insect_type) in tile_queue.iter() {
+//         if position_cache.0.contains_key(hex) {
+//             panic!();
+//         }
+//         position_cache.0.insert(
+//             *hex,
+//             PositionCacheEntry {
+//                 player: player.clone(),
+//                 _insect_type: insect_type.clone(),
+//                 entity,
+//             },
+//         );
+//     }
+// }
 
 fn s_cleanup_tile_placement(
     q_possible_placements: Query<Entity, With<PossiblePlacementTag>>,
@@ -219,86 +216,71 @@ fn s_cleanup_tile_placement(
 
 fn s_enter_move_finished(
     mut next_state: ResMut<NextState<AppState>>,
-    mut current_player: ResMut<CurrentPlayer>,
     q_bee: Query<(&InsectType, &Player, &HexCoordinate)>,
-    position_cache: Res<PositionCache>,
     mut commands: Commands,
 ) {
-    let mut players_that_lost = vec![];
+    panic!("Todo");
 
-    for (insect_type, queen_player, hex) in &q_bee {
-        if insect_type != &Queen {
-            continue;
-        }
-
-        if queen_player == &current_player.player {
-            continue;
-        }
-
-        let surrounded = ALL_DIRECTIONS
-            .iter()
-            .map(|direction| hex.get_relative(direction))
-            .all(|relative_position| position_cache.0.contains_key(&relative_position));
-
-        if surrounded {
-            players_that_lost.push(queen_player);
-        }
-    }
-
-    match players_that_lost.len() {
-        0 => {
-            match current_player.player {
-                Player1 => current_player.player = Player2,
-                Player2 => current_player.player = Player1,
-            }
-            next_state.set(AppState::Idle);
-        }
-        1 => {
-            let player_that_won = match players_that_lost[0] {
-                Player1 => Player2,
-                Player2 => Player1,
-            };
-            commands.insert_resource(GameResultResource {
-                result: Some(GameResult::PlayerWon(player_that_won)),
-            });
-            next_state.set(AppState::PlayerWon);
-        }
-        _ => {
-            commands.insert_resource(GameResultResource {
-                result: Some(GameResult::Draw),
-            });
-            next_state.set(AppState::PlayerWon);
-        }
-    }
+    // let mut players_that_lost = vec![];
+    //
+    // for (insect_type, queen_player, hex) in &q_bee {
+    //     if insect_type != &Queen {
+    //         continue;
+    //     }
+    //
+    //     if queen_player == &current_player.player {
+    //         continue;
+    //     }
+    //
+    //     let surrounded = ALL_DIRECTIONS
+    //         .iter()
+    //         .map(|direction| hex.get_relative(direction))
+    //         .all(|relative_position| position_cache.0.contains_key(&relative_position));
+    //
+    //     if surrounded {
+    //         players_that_lost.push(queen_player);
+    //     }
+    // }
+    //
+    // match players_that_lost.len() {
+    //     0 => {
+    //         match current_player.player {
+    //             Player1 => current_player.player = Player2,
+    //             Player2 => current_player.player = Player1,
+    //         }
+    //         next_state.set(AppState::Idle);
+    //     }
+    //     1 => {
+    //         let player_that_won = match players_that_lost[0] {
+    //             Player1 => Player2,
+    //             Player2 => Player1,
+    //         };
+    //         commands.insert_resource(GameResultResource {
+    //             result: Some(GameResult::PlayerWon(player_that_won)),
+    //         });
+    //         next_state.set(AppState::PlayerWon);
+    //     }
+    //     _ => {
+    //         commands.insert_resource(GameResultResource {
+    //             result: Some(GameResult::Draw),
+    //         });
+    //         next_state.set(AppState::PlayerWon);
+    //     }
+    // }
 }
 
-fn s_spawn_tiles_from_inventory(
-    q_inventory: Query<(&PlayerInventory, &Player)>,
-    game_assets: Res<GameAssets>,
-    current_player: Res<CurrentPlayer>,
-    mut commands: Commands,
-) {
-    let current_player = &current_player.player.clone();
-    let mut inventory = None;
-    for (i, player) in &q_inventory {
-        if player == current_player {
-            inventory = Some(i);
-        }
-    }
-
-    let inventory = inventory.unwrap();
+fn s_init_round(game_assets: Res<GameAssets>, game_state: Res<GameState>, mut commands: Commands) {
+    let moves = &game_state.get_moves();
+    let current_player = &game_state.current_player_turn.clone();
 
     let mut offset = -400.0;
 
-    //the queen needs to be played within the first 3 moves
-    let pieces_to_spawn = match inventory.moves_played == 2 && inventory.pieces.contains(&Queen) {
-        true => {
-            vec![Queen]
-        }
-        false => inventory.pieces.clone(),
-    };
+    let mut seen = HashSet::new();
 
-    for insect in pieces_to_spawn {
+    for r#move in moves
+        .iter()
+        .filter(|r#move|seen.insert(game_state.clone().get_piece(r#move.piece_id).insect_type))
+    {
         let material = match current_player {
             Player1 => game_assets.color_materials.white.clone(),
             Player2 => game_assets.color_materials.red.clone(),
@@ -314,13 +296,13 @@ fn s_spawn_tiles_from_inventory(
             },
             player: current_player.clone(),
             placable_tile_tag: PlacableTileState {},
-            insect,
+            insect: game_state.clone().get_piece(r#move.piece_id).clone().insect_type,
             level: Level(0),
         };
 
         let child = commands
             .spawn(SpriteBundle {
-                texture: game_assets.sprites.get(insect),
+                texture: game_assets.sprites.get(game_state.clone().get_piece(r#move.piece_id).insect_type),
                 transform: Transform::from_scale(vec3(0.15, 0.15, 0.15))
                     .with_translation(Vec3::new(0.0f32, 0.0f32, 10.0f32)),
                 ..default()
@@ -347,13 +329,13 @@ fn s_update_idle(
     mut commands: Commands,
     q_camera: Query<(&OrthographicProjection, &Transform), With<Camera2d>>,
     q_is_in_game: Query<&IsInGame>,
-    current_player: Res<CurrentPlayer>,
     mut next_state: ResMut<NextState<AppState>>,
+    game_state: Res<GameState>,
 ) {
     match world_cursor.press_state {
         PressState::JustPressed => {
             for (entity, transform, player) in &mut q_placable_tiles {
-                if *player != current_player.player {
+                if *player != game_state.current_player_turn {
                     continue;
                 }
 
@@ -392,6 +374,16 @@ fn s_update_idle(
     }
 }
 
+fn s_move_tile_enter(
+    selected_tile: Res<SelectedTile>,
+    game_state: Res<GameState>,
+    mut commands: Commands,
+){
+    for possible_move in game_state.get_moves().iter().filter(|r#move|r#move.piece_id==selected_tile.1) {
+        commands.sp
+    }
+}
+
 fn s_move_tile(
     world_cursor: Res<WorldCursor>,
     // mut q_transform:  Query<(&mut Transform)>,
@@ -405,111 +397,109 @@ fn s_move_tile(
     mut commands: Commands,
     selected_tile: Res<SelectedTile>,
     mut next_state: ResMut<NextState<AppState>>,
-    current_player: Res<CurrentPlayer>,
-    position_cache: Res<PositionCache>,
 ) {
-    let selected_entity = selected_tile.0;
-
-    let current_player = &current_player.player.clone();
-    let mut inventory = None;
-    for (i, player) in &mut q_inventory {
-        if player == current_player {
-            inventory = Some(i);
-        }
-    }
-
-    let mut inventory = inventory.unwrap();
-
-    //    let mut current_position = q_hex_coord_of_existing.get(selected_tile.0) ;
-
-    match world_cursor.press_state {
-        // PressState::Released => {}
-        // PressState::JustPressed => {}
-        PressState::Pressed => {
-            if let Ok(mut transform) = q_possible_placements.get_mut(selected_entity) {
-                transform.translation =
-                    Vec3::new(world_cursor.position.x, world_cursor.position.y, 100.);
-            }
-        }
-
-        //PressState::JustReleased => {}
-        _ => {
-            if let Ok(selected_transform) = q_possible_placements.get_mut(selected_entity) {
-                for (possible_placement, possible_hex_coordinate) in &mut m_placement_markers {
-                    if possible_placement
-                        .translation
-                        .with_z(0.)
-                        .distance(selected_transform.translation.with_z(0.))
-                        < 50.
-                    {
-                        // commands.spawn(HiveTile::new(*hex_coordinate, &game_assets, current_player.player));
-
-                        match q_placable_tile_state.get(selected_entity) {
-                            Ok(_) => {
-                                let mut new_pieces = inventory.pieces.clone();
-
-                                new_pieces.remove(
-                                    new_pieces
-                                        .iter()
-                                        .position(|i| i == q_insect.get(selected_entity).unwrap())
-                                        .unwrap(),
-                                );
-
-                                inventory.pieces = new_pieces;
-
-                                commands
-                                    .entity(selected_entity)
-                                    .insert(IsInGame {})
-                                    .insert(possible_hex_coordinate.clone())
-                                    .remove::<PlacableTileState>();
-                            }
-                            Err(_) => {
-                                match q_is_on_top_of.get(selected_entity) {
-                                    Ok(is_on_top_of) => {
-                                        commands
-                                            .entity(is_on_top_of.0.tile_below)
-                                            .remove::<HasTileOnTop>();
-                                    }
-                                    Err(_) => {}
-                                }
-
-                                commands
-                                    .entity(selected_entity)
-                                    .insert(possible_hex_coordinate.clone());
-                            }
-                        }
-
-                        inventory.moves_played += 1;
-                        next_state.set(AppState::MoveFinished);
-
-                        match position_cache.0.get(&possible_hex_coordinate) {
-                            None => {
-                                commands
-                                    .entity(selected_entity)
-                                    .remove::<IsOnTopOf>()
-                                    .insert(Level(0));
-                            }
-                            Some(tile_below) => {
-                                commands.entity(tile_below.entity).insert(HasTileOnTop {});
-                                let level = q_level
-                                    .get(tile_below.entity)
-                                    .expect("Every playable tile needs to have a Level component");
-                                let new_level = Level(level.0 .0 + 1);
-                                commands
-                                    .entity(selected_entity)
-                                    .insert(IsOnTopOf {
-                                        tile_below: tile_below.entity,
-                                    })
-                                    .insert(new_level);
-                            }
-                        };
-
-                        return;
-                    }
-                }
-
-                next_state.set(AppState::Idle);
-            }
-        }
-    }
+    // let selected_entity = selected_tile.0;
+    //
+    // let current_player = &current_player.player.clone();
+    // let mut inventory = None;
+    // for (i, player) in &mut q_inventory {
+    //     if player == current_player {
+    //         inventory = Some(i);
+    //     }
+    // }
+    //
+    // let mut inventory = inventory.unwrap();
+    //
+    // //    let mut current_position = q_hex_coord_of_existing.get(selected_tile.0) ;
+    //
+    // match world_cursor.press_state {
+    //     // PressState::Released => {}
+    //     // PressState::JustPressed => {}
+    //     PressState::Pressed => {
+    //         if let Ok(mut transform) = q_possible_placements.get_mut(selected_entity) {
+    //             transform.translation =
+    //                 Vec3::new(world_cursor.position.x, world_cursor.position.y, 100.);
+    //         }
+    //     }
+    //
+    //     //PressState::JustReleased => {}
+    //     _ => {
+    //         if let Ok(selected_transform) = q_possible_placements.get_mut(selected_entity) {
+    //             for (possible_placement, possible_hex_coordinate) in &mut m_placement_markers {
+    //                 if possible_placement
+    //                     .translation
+    //                     .with_z(0.)
+    //                     .distance(selected_transform.translation.with_z(0.))
+    //                     < 50.
+    //                 {
+    //                     // commands.spawn(HiveTile::new(*hex_coordinate, &game_assets, current_player.player));
+    //
+    //                     match q_placable_tile_state.get(selected_entity) {
+    //                         Ok(_) => {
+    //                             let mut new_pieces = inventory.pieces.clone();
+    //
+    //                             new_pieces.remove(
+    //                                 new_pieces
+    //                                     .iter()
+    //                                     .position(|i| i == q_insect.get(selected_entity).unwrap())
+    //                                     .unwrap(),
+    //                             );
+    //
+    //                             inventory.pieces = new_pieces;
+    //
+    //                             commands
+    //                                 .entity(selected_entity)
+    //                                 .insert(IsInGame {})
+    //                                 .insert(possible_hex_coordinate.clone())
+    //                                 .remove::<PlacableTileState>();
+    //                         }
+    //                         Err(_) => {
+    //                             match q_is_on_top_of.get(selected_entity) {
+    //                                 Ok(is_on_top_of) => {
+    //                                     commands
+    //                                         .entity(is_on_top_of.0.tile_below)
+    //                                         .remove::<HasTileOnTop>();
+    //                                 }
+    //                                 Err(_) => {}
+    //                             }
+    //
+    //                             commands
+    //                                 .entity(selected_entity)
+    //                                 .insert(possible_hex_coordinate.clone());
+    //                         }
+    //                     }
+    //
+    //                     inventory.moves_played += 1;
+    //                     next_state.set(AppState::MoveFinished);
+    //
+    //                     match position_cache.0.get(&possible_hex_coordinate) {
+    //                         None => {
+    //                             commands
+    //                                 .entity(selected_entity)
+    //                                 .remove::<IsOnTopOf>()
+    //                                 .insert(Level(0));
+    //                         }
+    //                         Some(tile_below) => {
+    //                             commands.entity(tile_below.entity).insert(HasTileOnTop {});
+    //                             let level = q_level
+    //                                 .get(tile_below.entity)
+    //                                 .expect("Every playable tile needs to have a Level component");
+    //                             let new_level = Level(level.0 .0 + 1);
+    //                             commands
+    //                                 .entity(selected_entity)
+    //                                 .insert(IsOnTopOf {
+    //                                     tile_below: tile_below.entity,
+    //                                 })
+    //                                 .insert(new_level);
+    //                         }
+    //                     };
+    //
+    //                     return;
+    //                 }
+    //             }
+    //
+    //             next_state.set(AppState::Idle);
+    //         }
+    //     }
+    // }
 }
