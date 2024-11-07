@@ -136,6 +136,8 @@ pub struct Level(pub u32);
 
 #[derive(Component)]
 pub struct HasTileOnTop {}
+#[derive(Component)]
+pub struct TileID (pub u32);
 
 #[derive(Bundle)]
 pub struct HiveTile {
@@ -144,6 +146,7 @@ pub struct HiveTile {
     pub(crate) placable_tile_tag: PlacableTileState,
     pub(crate) insect: InsectType,
     pub(crate) level: Level,
+    pub(crate) tile_id: TileID,
 }
 
 #[derive(Bundle)]

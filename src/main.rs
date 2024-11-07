@@ -1,12 +1,7 @@
 //! Renders an animated sprite by loading all animation frames from a single image (a sprite sheet)
 //! into a texture atlas, and changing the displayed image periodically.
 
-use crate::data::components::{
-    ColorMaterials, GameAssets, GameResultResource, HasTileOnTop, HiveTile, IsInGame, IsOnTopOf,
-    Level, MainCamera, PlacableTileState, PlayerInventory,
-PositionCacheEntry,
-    PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites,
-};
+use crate::data::components::{ColorMaterials, GameAssets, GameResultResource, HasTileOnTop, HiveTile, IsInGame, IsOnTopOf, Level, MainCamera, PlacableTileState, PlayerInventory, PositionCacheEntry, PossiblePlacementMarker, PossiblePlacementTag, SelectedTile, Sprites, TileID};
 pub use crate::data::enums::InsectType::*;
 use crate::data::enums::Player::{Player1, Player2};
 use crate::data::enums::{AppState, GameResult, InsectType, Player};
@@ -37,22 +32,12 @@ fn main() {
         .add_systems(OnEnter(AppState::Init), s_init)
         .add_systems(Update, s_update_camera)
         .add_systems(OnEnter(AppState::Idle), s_init_round)
-         .add_systems(Update, s_update_ui_for_round)
-        .add_systems(
-            Update,
-            s_update_idle
-                .run_if(in_state(AppState::Idle)),
-        )
-        .add_systems(
-            Update,
-            s_move_tile
-                .run_if(in_state(AppState::MovingTile)),
-        )
+        .add_systems(Update, s_update_ui_for_round)
+        .add_systems(Update, s_update_idle.run_if(in_state(AppState::Idle)))
+        .add_systems(Update, s_move_tile.run_if(in_state(AppState::MovingTile)))
+        .add_systems(OnEnter(AppState::MovingTile), s_move_tile_enter)
         .add_systems(OnExit(AppState::MovingTile), s_cleanup_tile_placement)
-        .add_systems(
-            OnEnter(AppState::MoveFinished),
-            (s_enter_move_finished),
-        )
+        .add_systems(OnEnter(AppState::MoveFinished), (s_enter_move_finished))
         .insert_resource(GameResultResource { result: None })
         .insert_resource(create_game_state())
         .run();
@@ -279,7 +264,7 @@ fn s_init_round(game_assets: Res<GameAssets>, game_state: Res<GameState>, mut co
 
     for r#move in moves
         .iter()
-        .filter(|r#move|seen.insert(game_state.clone().get_piece(r#move.piece_id).insect_type))
+        .filter(|r#move| seen.insert(game_state.clone().get_piece(r#move.piece_id).insect_type))
     {
         let material = match current_player {
             Player1 => game_assets.color_materials.white.clone(),
@@ -296,13 +281,20 @@ fn s_init_round(game_assets: Res<GameAssets>, game_state: Res<GameState>, mut co
             },
             player: current_player.clone(),
             placable_tile_tag: PlacableTileState {},
-            insect: game_state.clone().get_piece(r#move.piece_id).clone().insect_type,
+            insect: game_state
+                .clone()
+                .get_piece(r#move.piece_id)
+                .clone()
+                .insect_type,
             level: Level(0),
+            tile_id:TileID(r#move.piece_id)
         };
 
         let child = commands
             .spawn(SpriteBundle {
-                texture: game_assets.sprites.get(game_state.clone().get_piece(r#move.piece_id).insect_type),
+                texture: game_assets
+                    .sprites
+                    .get(game_state.clone().get_piece(r#move.piece_id).insect_type),
                 transform: Transform::from_scale(vec3(0.15, 0.15, 0.15))
                     .with_translation(Vec3::new(0.0f32, 0.0f32, 10.0f32)),
                 ..default()
@@ -331,6 +323,7 @@ fn s_update_idle(
     q_is_in_game: Query<&IsInGame>,
     mut next_state: ResMut<NextState<AppState>>,
     game_state: Res<GameState>,
+    q_tile_id: Query<&TileID>
 ) {
     match world_cursor.press_state {
         PressState::JustPressed => {
@@ -345,7 +338,7 @@ fn s_update_idle(
                     .distance(Vec2::new(transform.translation.x, transform.translation.y));
 
                 if distance_to_cursor < max_distance {
-                    commands.insert_resource(SelectedTile(entity.clone()));
+                    commands.insert_resource(SelectedTile(entity.clone(), q_tile_id.get(entity).unwrap().0 ));
 
                     next_state.set(AppState::MovingTile);
                     break;
@@ -377,10 +370,27 @@ fn s_update_idle(
 fn s_move_tile_enter(
     selected_tile: Res<SelectedTile>,
     game_state: Res<GameState>,
+    game_assets: Res<GameAssets>,
     mut commands: Commands,
-){
-    for possible_move in game_state.get_moves().iter().filter(|r#move|r#move.piece_id==selected_tile.1) {
-        commands.sp
+) {
+    for possible_move in game_state
+        .get_moves()
+        .iter()
+        .filter(|r#move| r#move.piece_id == selected_tile.1)
+    {
+        let bundle = PossiblePlacementMarker {
+            renderer: MaterialMesh2dBundle {
+                mesh: game_assets.mesh.clone(),
+                material: game_assets.color_materials.grey.clone(),
+                transform: possible_move.to
+                    .get_transform(&Level(0), -2.)
+                    .with_scale(Vec3::new(1.2, 1.2, 1.2)),
+                ..default()
+            },
+            possible_placement_tag: Default::default(),
+            hex_coordinate: possible_move.to,
+        };
+        commands.spawn(bundle);
     }
 }
 

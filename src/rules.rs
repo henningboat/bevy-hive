@@ -1,5 +1,5 @@
-use crate::data::components::{GameAssets, HasTileOnTop, IsInGame, IsOnTopOf, Level, PossiblePlacementMarker,
-    SelectedTile,
+use crate::data::components::{
+    GameAssets, HasTileOnTop, IsInGame, IsOnTopOf, Level, PossiblePlacementMarker, SelectedTile,
 };
 use crate::data::enums::{InsectType, Player};
 use crate::hex_coordinate::{HexCoordinate, ALL_DIRECTIONS};

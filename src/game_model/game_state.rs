@@ -14,7 +14,7 @@ pub struct Piece {
     pub is_below_piece: Option<u32>,
 }
 
-#[derive(Clone,Copy)]
+#[derive(Clone, Copy)]
 pub struct Move {
     pub piece_id: u32,
     pub to: HexCoordinate,
@@ -26,9 +26,13 @@ pub struct GameState {
     pub current_player_turn: Player,
 }
 
-impl GameState{
-    pub fn get_piece(self, piece_id:u32)->Piece{
-         self.pieces.iter().filter(|piece|piece.id==piece_id).collect::<Vec<_>>()[0].clone()
+impl GameState {
+    pub fn get_piece(self, piece_id: u32) -> Piece {
+        self.pieces
+            .iter()
+            .filter(|piece| piece.id == piece_id)
+            .collect::<Vec<_>>()[0]
+            .clone()
     }
 }
 
@@ -38,19 +42,22 @@ pub fn create_game_state() -> GameState {
     let mut id: u32 = 0;
 
     let players = vec![Player1, Player2];
-    let pieces = players.iter().flat_map(|player| {
-        default_inventory.pieces.iter().map(move |insect_type| {
-            id += 1;
+    let pieces = players
+        .iter()
+        .flat_map(|player| {
+            default_inventory.pieces.iter().map(move |insect_type| {
+                id += 1;
 
-            Piece {
-                insect_type: *insect_type,
-                id,
-                player: *player,
-                position: None,
-                is_below_piece: None,
-            }
+                Piece {
+                    insect_type: *insect_type,
+                    id,
+                    player: *player,
+                    position: None,
+                    is_below_piece: None,
+                }
+            })
         })
-    }).collect();
+        .collect();
 
     GameState {
         pieces,
@@ -65,14 +72,19 @@ impl GameState {
         let mut valid_moves = vec![];
 
         {
-            let new_pieces: Vec<&Piece> = self.pieces.iter().filter(|piece| piece.player == self.current_player_turn && piece.position == None).collect();
+            let new_pieces: Vec<&Piece> = self
+                .pieces
+                .iter()
+                .filter(|piece| piece.player == self.current_player_turn && piece.position == None)
+                .collect();
 
             if new_pieces.len() > 0 {
                 let player_has_tile_in_game = self.pieces.iter().any(|piece| {
                     piece.player == self.current_player_turn && piece.position != None
                 });
 
-                let valid_coordinates = get_coordinates_for_new_piece(&self, &position_cache, !player_has_tile_in_game);
+                let valid_coordinates =
+                    get_coordinates_for_new_piece(&self, &position_cache, !player_has_tile_in_game);
 
                 valid_moves.extend(valid_coordinates.iter().flat_map(|coordinate| {
                     new_pieces.iter().map(|piece| Move {
@@ -84,14 +96,21 @@ impl GameState {
         }
 
         {
-            let existing_piece: Vec<&Piece> = self.pieces.iter().filter(|piece| piece.player == self.current_player_turn && piece.position != None).collect();
+            let existing_piece: Vec<&Piece> = self
+                .pieces
+                .iter()
+                .filter(|piece| piece.player == self.current_player_turn && piece.position != None)
+                .collect();
 
             for piece in existing_piece {
                 let insect_type = piece.insect_type;
 
-                let selected_tile_position = piece.position.expect("Pieces inside existing_piece are filtered for having a position");
+                let selected_tile_position = piece
+                    .position
+                    .expect("Pieces inside existing_piece are filtered for having a position");
 
-                let position_cache_without_selected = &position_cache.get_without(&selected_tile_position);
+                let position_cache_without_selected =
+                    &position_cache.get_without(&selected_tile_position);
 
                 //todo
                 // if !q_is_on_top_of.contains(selected_tile.0) {
@@ -156,7 +175,7 @@ struct NewPositionCache {
 }
 
 impl NewPositionCache {
-    fn new(game_state: & GameState) -> Self {
+    fn new(game_state: &GameState) -> Self {
         let mut map = HashMap::new();
         for piece in &game_state.pieces {
             if let Some(coordinate) = piece.position {
@@ -214,14 +233,18 @@ impl NewPositionCache {
 }
 
 fn get_moves_for_queen(
-    position_cache: & NewPositionCache,
+    position_cache: &NewPositionCache,
     current_position: HexCoordinate,
-    piece: & Piece,
+    piece: &Piece,
 ) -> Vec<Move> {
-    position_cache.get_surrounding_slidable_tiles(current_position, &vec![]).iter().map(|hex_coordinate| Move {
-        piece_id: piece.id,
-        to: hex_coordinate.clone(),
-    }).collect()
+    position_cache
+        .get_surrounding_slidable_tiles(current_position, &vec![])
+        .iter()
+        .map(|hex_coordinate| Move {
+            piece_id: piece.id,
+            to: hex_coordinate.clone(),
+        })
+        .collect()
 }
 //
 // fn get_moves_for_beetle(
@@ -340,7 +363,7 @@ fn get_coordinates_for_new_piece(
 ) -> Vec<HexCoordinate> {
     let mut valid_coordinates = vec![];
 
-    if position_cache.map.is_empty(){
+    if position_cache.map.is_empty() {
         return vec![HexCoordinate::origin()];
     }
 

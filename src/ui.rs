@@ -1,8 +1,8 @@
 use crate::data::components::{GameAssets, GameResultResource};
 use crate::data::enums::{GameResult, Player};
+use crate::game_model::game_state::GameState;
 use bevy::prelude::Commands;
 use bevy::prelude::*;
-use crate::game_model::game_state::GameState;
 
 #[derive(Component)]
 pub struct UIStatusText {}
